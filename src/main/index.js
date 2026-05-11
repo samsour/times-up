@@ -98,7 +98,7 @@ function updateTrayTitle() {
   if (!tray) return
   if (activeTimer) {
     const sec = Math.floor((Date.now() - activeTimer.start) / 1000)
-    const h = Math.floor(sec / 3600).toString().padStart(2, '0')
+    const h = Math.floor(sec / 3600).toString()
     const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0')
     tray.setTitle(activeTimer.label ? `${h}:${m}  ${activeTimer.label}` : `${h}:${m}`)
   } else {
