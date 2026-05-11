@@ -112,7 +112,8 @@ function createTray() {
   const assetsPath = app.isPackaged
     ? path.join(process.resourcesPath, 'assets')
     : path.join(__dirname, '../../src/assets')
-  const icon = nativeImage.createFromPath(path.join(assetsPath, 'icon.png'))
+  const iconFile = isDev ? 'icon-dev.png' : 'icon.png'
+  const icon = nativeImage.createFromPath(path.join(assetsPath, iconFile))
     .resize({ width: 18, height: 18 })
   icon.setTemplateImage(true)
 
