@@ -89,6 +89,22 @@
   color: var(--text-dim);
 }
 
+.setup-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: color 0.12s;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--border-strong);
+}
+
+.setup-link:hover {
+  color: var(--text);
+}
+
 .setup-error {
   font-size: 12px;
   color: var(--danger);

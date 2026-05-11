@@ -56,8 +56,17 @@ export default function Setup({ onComplete }) {
               autoFocus
             />
             <p className="setup-hint">
-              Get it from <span className="mono">ClickUp → Settings → Apps → Generate</span>
+              Found under <span className="mono">Settings → Apps → Generate</span>
             </p>
+            <button
+              className="setup-link"
+              onClick={() => window.api.shell.openExternal('https://app.clickup.com/settings/apps')}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+              </svg>
+              Open ClickUp API settings
+            </button>
             {error && <div className="setup-error">{error}</div>}
             <button
               className="setup-button"
