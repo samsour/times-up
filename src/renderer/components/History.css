@@ -185,6 +185,27 @@
   color: var(--accent);
 }
 
+.entry-restart {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.12s;
+}
+
+.entry:hover .entry-restart {
+  opacity: 1;
+}
+
+.entry-restart:hover {
+  color: var(--success);
+  background: rgba(74, 222, 128, 0.1);
+}
+
 .entry-delete {
   width: 22px;
   height: 22px;

@@ -42,11 +42,9 @@ export async function getTasks(listId) {
 
 // Time tracking
 export async function startTimer(teamId, taskId, description = '') {
-  return api.request({
-    method: 'POST',
-    path: `/team/${teamId}/time_entries/start`,
-    body: { tid: taskId, description }
-  })
+  const body = { description }
+  if (taskId) body.tid = taskId
+  return api.request({ method: 'POST', path: `/team/${teamId}/time_entries/start`, body })
 }
 
 export async function stopTimer(teamId) {

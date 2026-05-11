@@ -47,11 +47,7 @@ export default function Tracker({ teamId, onReset }) {
   return (
     <div className="tracker">
       <header className="tracker-header">
-        <div className="tracker-brand">
-          <span className="brand-dot" />
-          <span className="brand-name">timetrack</span>
-        </div>
-        <div className="tracker-tabs">
+<div className="tracker-tabs">
           <TabBtn active={view === 'timer'} onClick={() => setView('timer')}>Timer</TabBtn>
           <TabBtn active={view === 'manual'} onClick={() => setView('manual')}>Add</TabBtn>
           <TabBtn active={view === 'history'} onClick={() => setView('history')}>Log</TabBtn>
@@ -89,7 +85,7 @@ export default function Tracker({ teamId, onReset }) {
           />
         )}
         {view === 'history' && (
-          <History teamId={teamId} key={refreshKey} onChange={bumpRefresh} />
+          <History teamId={teamId} key={refreshKey} onChange={bumpRefresh} onRestart={() => setView('timer')} />
         )}
       </main>
     </div>

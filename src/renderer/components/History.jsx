@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { getTimeEntries, deleteTimeEntry, updateTimeEntry } from '../lib/clickup.js'
+import { getTimeEntries, deleteTimeEntry, updateTimeEntry, startTimer } from '../lib/clickup.js'
 import { formatDurationShort, formatTime, formatDate, startOfDay, endOfDay, parseDurationInput } from '../lib/time.js'
 import './History.css'
 
-export default function History({ teamId, onChange }) {
+export default function History({ teamId, onChange, onRestart }) {
   const [range, setRange] = useState('today') // 'today' | 'week'
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -43,6 +43,16 @@ export default function History({ teamId, onChange }) {
       await deleteTimeEntry(teamId, entry.id)
       load()
       onChange?.()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  async function handleRestart(entry) {
+    try {
+      await startTimer(teamId, entry.task?.id || null, entry.description || '')
+      onChange?.()
+      onRestart?.()
     } catch (e) {
       alert(e.message)
     }
@@ -149,6 +159,11 @@ export default function History({ teamId, onChange }) {
                         {formatDurationShort(parseInt(entry.duration))}
                       </button>
                     )}
+                    <button className="entry-restart" onClick={() => handleRestart(entry)} title="Start again">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </button>
                     <button className="entry-delete" onClick={() => handleDelete(entry)} title="Delete">
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />

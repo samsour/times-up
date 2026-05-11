@@ -14,29 +14,6 @@
   -webkit-app-region: drag;
 }
 
-.tracker-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  -webkit-app-region: no-drag;
-}
-
-.brand-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
-}
-
-.brand-name {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-}
-
 .tracker-tabs {
   display: flex;
   gap: 2px;

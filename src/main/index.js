@@ -21,7 +21,7 @@ function createWindow() {
     fullscreenable: false,
     skipTaskbar: true,
     transparent: false,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#000000',
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       nodeIntegration: false,
