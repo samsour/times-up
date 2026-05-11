@@ -8,13 +8,19 @@ export default function App() {
   const [teamId, setTeamId] = useState(null)
 
   useEffect(() => {
-    (async () => {
+    const init = async () => {
+      // On Windows dev the preload can attach slightly after first render
+      if (!window.api) {
+        setTimeout(init, 50)
+        return
+      }
       const t = await window.api.store.get('clickup_token')
       const tid = await window.api.store.get('team_id')
       setToken(t || null)
       setTeamId(tid || null)
       setReady(true)
-    })()
+    }
+    init()
   }, [])
 
   if (!ready) return <div style={{ padding: 40, color: 'var(--text-dim)' }}>Loading…</div>
