@@ -1,0 +1,105 @@
+.manual {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 20px 18px;
+  gap: 12px;
+  overflow-y: auto;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.manual-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.manual-title-italic {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.manual-row {
+  display: flex;
+  gap: 10px;
+}
+
+.manual-row-split .manual-field {
+  flex: 1;
+}
+
+.manual-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.manual-field label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.optional {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.manual-input {
+  padding: 9px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text);
+  transition: border-color 0.12s;
+  color-scheme: dark;
+}
+
+.manual-input:focus {
+  border-color: var(--accent);
+}
+
+.manual-input::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  font-family: var(--font-display);
+}
+
+.manual-error {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--danger);
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: var(--radius-sm);
+}
+
+.manual-save {
+  margin-top: auto;
+  padding: 12px;
+  background: var(--accent);
+  color: #0a0a0a;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.manual-save:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -8px var(--accent);
+}
+
+.manual-save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

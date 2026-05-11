@@ -1,0 +1,91 @@
+.tracker {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+}
+
+.tracker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.tracker-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.brand-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.brand-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.tracker-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-elevated);
+  padding: 2px;
+  border-radius: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.tab {
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: 6px;
+  transition: all 0.12s;
+  letter-spacing: 0.02em;
+}
+
+.tab:hover {
+  color: var(--text-dim);
+}
+
+.tab-active {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 1px 0 var(--border-strong);
+}
+
+.tracker-settings {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-radius: 6px;
+  transition: all 0.12s;
+  -webkit-app-region: no-drag;
+}
+
+.tracker-settings:hover {
+  color: var(--text);
+  background: var(--bg-elevated);
+}
+
+.tracker-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
