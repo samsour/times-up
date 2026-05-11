@@ -1,6 +1,18 @@
+import { useState, useEffect } from 'react'
 import './Settings.css'
 
 export default function Settings({ theme, onThemeChange, font, onFontChange, onSignOut }) {
+  const [autoLaunch, setAutoLaunch] = useState(false)
+
+  useEffect(() => {
+    window.api.app.getLoginItemSettings().then(setAutoLaunch)
+  }, [])
+
+  async function handleAutoLaunch(val) {
+    await window.api.app.setLoginItemSettings(val)
+    setAutoLaunch(val)
+  }
+
   return (
     <div className="settings">
       <div className="settings-section">
@@ -31,9 +43,7 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
         <div className="settings-row">
           <div className="settings-row-title">
             Timer font
-            <span className="settings-font-preview" data-font-style={font}>
-              {font === 'dotted' ? '0:00' : '0:00'}
-            </span>
+            <span className="settings-font-preview" data-font-style={font}>0:00</span>
           </div>
           <div className="theme-toggle">
             <button
@@ -49,6 +59,19 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
               Dotted
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-label">System</div>
+        <div className="settings-row">
+          <span className="settings-row-title">Launch at login</span>
+          <button
+            className={`settings-toggle ${autoLaunch ? 'settings-toggle-on' : ''}`}
+            onClick={() => handleAutoLaunch(!autoLaunch)}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
         </div>
       </div>
 

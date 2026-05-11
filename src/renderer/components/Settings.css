@@ -81,6 +81,36 @@
   box-shadow: 0 1px 0 var(--border-strong);
 }
 
+.settings-toggle {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--border-strong);
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.settings-toggle-on {
+  background: var(--accent);
+}
+
+.settings-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.settings-toggle-on .settings-toggle-knob {
+  transform: translateX(16px);
+  background: var(--text);
+}
+
 .settings-signout {
   display: flex;
   align-items: center;

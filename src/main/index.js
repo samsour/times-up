@@ -6,6 +6,8 @@ import Store from 'electron-store'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const store = new Store()
 
+app.setName('ClickUp Tracker')
+
 let tray = null
 let win = null
 
@@ -168,3 +170,5 @@ ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
 
 ipcMain.handle('window:hide', () => win.hide())
 ipcMain.handle('shell:openExternal', (_, url) => shell.openExternal(url))
+ipcMain.handle('app:getLoginItemSettings', () => app.getLoginItemSettings().openAtLogin)
+ipcMain.handle('app:setLoginItemSettings', (_, openAtLogin) => app.setLoginItemSettings({ openAtLogin }))

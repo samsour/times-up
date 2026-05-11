@@ -14,5 +14,9 @@ contextBridge.exposeInMainWorld('api', {
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
+  },
+  app: {
+    getLoginItemSettings: () => ipcRenderer.invoke('app:getLoginItemSettings'),
+    setLoginItemSettings: (openAtLogin) => ipcRenderer.invoke('app:setLoginItemSettings', openAtLogin)
   }
 })
