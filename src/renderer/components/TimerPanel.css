@@ -40,6 +40,22 @@
   font-weight: 500;
 }
 
+.timer-task-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.timer-task-list {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
 .status-dot {
   width: 6px;
   height: 6px;
@@ -217,10 +233,29 @@
   text-overflow: ellipsis;
 }
 
-.suggestion-status {
+.suggestion-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
+  color: var(--text-muted);
+}
+
+.suggestion-list {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+.suggestion-meta-sep {
+  flex-shrink: 0;
+}
+
+.suggestion-status {
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
 }
 
 .suggestion-play {

@@ -33,6 +33,10 @@ export async function getListsInFolder(folderId) {
   return lists
 }
 
+export async function getTask(taskId) {
+  return api().request({ path: `/task/${taskId}` })
+}
+
 export async function getTasks(listId) {
   const { tasks } = await api().request({
     path: `/list/${listId}/task?archived=false&subtasks=true&include_closed=false`
@@ -103,7 +107,7 @@ export async function searchTasks(teamId, query) {
 export async function getMyTasks(teamId, userId) {
   try {
     const { tasks } = await api().request({
-      path: `/team/${teamId}/task?assignees[]=${userId}&include_closed=false&order_by=updated&reverse=true&page=0`
+      path: `/team/${teamId}/task?assignees[]=${userId}&statuses[]=in%20progress&include_closed=false&order_by=updated&page=0`
     })
     return tasks || []
   } catch {

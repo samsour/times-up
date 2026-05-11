@@ -3,7 +3,7 @@ import TimerPanel from './TimerPanel.jsx'
 import TaskPicker from './TaskPicker.jsx'
 import History from './History.jsx'
 import ManualEntry from './ManualEntry.jsx'
-import { getCurrentTimer, startTimer } from '../lib/clickup.js'
+import { getCurrentTimer, startTimer, updateTimeEntry } from '../lib/clickup.js'
 import './Tracker.css'
 
 export default function Tracker({ teamId, userId, onReset }) {
@@ -33,7 +33,11 @@ export default function Tracker({ teamId, userId, onReset }) {
 
   async function handleBrowsePick(task) {
     try {
-      await startTimer(teamId, task.id, '')
+      if (currentEntry?.id && !currentEntry.task) {
+        await updateTimeEntry(teamId, currentEntry.id, { tid: task.id })
+      } else {
+        await startTimer(teamId, task.id, '')
+      }
       bumpRefresh()
     } catch {}
     setView('timer')

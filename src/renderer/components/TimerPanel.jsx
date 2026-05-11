@@ -5,6 +5,7 @@ import {
   updateTimeEntry,
   getTimeEntries,
   getMyTasks,
+  getTask,
 } from "../lib/clickup.js";
 import { formatDuration, formatDurationShort, endOfDay } from "../lib/time.js";
 import "./TimerPanel.css";
@@ -24,6 +25,7 @@ export default function TimerPanel({
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [lastEntry, setLastEntry] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [taskDetail, setTaskDetail] = useState(null);
 
   const isRunning = !!currentEntry;
 
@@ -45,9 +47,17 @@ export default function TimerPanel({
     if (currentEntry?.id) setDescription(currentEntry.description || "");
   }, [currentEntry?.id]);
 
-  // Fetch suggestions + last entry when idle
+  // Fetch full task details (includes list) when tracking a task
   useEffect(() => {
-    if (isRunning) return;
+    if (!currentEntry?.task?.id) { setTaskDetail(null); return; }
+    getTask(currentEntry.task.id).then(setTaskDetail).catch(() => setTaskDetail(null));
+  }, [currentEntry?.task?.id]);
+
+  const isRunningUnassigned = isRunning && !currentEntry?.task;
+
+  // Fetch suggestions when idle or running unassigned
+  useEffect(() => {
+    if (isRunning && !isRunningUnassigned) return;
     if (userId) {
       setSuggestionsLoading(true);
       getMyTasks(teamId, userId)
@@ -55,16 +65,18 @@ export default function TimerPanel({
         .catch(() => {})
         .finally(() => setSuggestionsLoading(false));
     }
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    getTimeEntries(teamId, sevenDaysAgo, endOfDay())
-      .then((data) => {
-        const sorted = (data || []).sort(
-          (a, b) => parseInt(b.start) - parseInt(a.start)
-        );
-        setLastEntry(sorted[0] || null);
-      })
-      .catch(() => {});
-  }, [teamId, userId, isRunning]);
+    if (!isRunning) {
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      getTimeEntries(teamId, sevenDaysAgo, endOfDay())
+        .then((data) => {
+          const sorted = (data || []).sort(
+            (a, b) => parseInt(b.start) - parseInt(a.start)
+          );
+          setLastEntry(sorted[0] || null);
+        })
+        .catch(() => {});
+    }
+  }, [teamId, userId, isRunning, isRunningUnassigned]);
 
   async function handleStop() {
     setBusy(true);
@@ -84,6 +96,20 @@ export default function TimerPanel({
     setError("");
     try {
       await startTimer(teamId, taskId, desc);
+      setShowSuggestions(false);
+      onChange();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function assignToRunning(taskId) {
+    setBusy(true);
+    setError("");
+    try {
+      await updateTimeEntry(teamId, currentEntry.id, { tid: taskId });
       setShowSuggestions(false);
       onChange();
     } catch (e) {
@@ -133,7 +159,12 @@ export default function TimerPanel({
           {isRunning ? (
             <>
               <span className="status-dot status-running" />
-              <span>{currentEntry.task?.name || "unassigned"}</span>
+              <div className="timer-task-info">
+                <span>{currentEntry.task?.name || "unassigned"}</span>
+                {taskDetail?.list?.name && (
+                  <span className="timer-task-list">{taskDetail.list.name}</span>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -163,7 +194,7 @@ export default function TimerPanel({
       {error && <div className="timer-error">{error}</div>}
 
       {/* Assign task button + collapsible suggestions */}
-      {!isRunning && (
+      {(!isRunning || isRunningUnassigned) && (
         <>
           <button
             className={`task-assign-btn ${
@@ -204,18 +235,26 @@ export default function TimerPanel({
                 <button
                   key={task.id}
                   className="suggestion-item"
-                  onClick={() => startWithTask(task.id)}
+                  onClick={() => isRunningUnassigned ? assignToRunning(task.id) : startWithTask(task.id)}
                 >
                   <div className="suggestion-info">
                     <span className="suggestion-name">{task.name}</span>
-                    {task.status?.status && (
-                      <span
-                        className="suggestion-status"
-                        style={{ color: task.status.color || "var(--text-muted)" }}
-                      >
-                        {task.status.status}
-                      </span>
-                    )}
+                    <span className="suggestion-meta">
+                      {task.list?.name && (
+                        <span className="suggestion-list">{task.list.name}</span>
+                      )}
+                      {task.list?.name && task.status?.status && (
+                        <span className="suggestion-meta-sep">·</span>
+                      )}
+                      {task.status?.status && (
+                        <span
+                          className="suggestion-status"
+                          style={{ color: task.status.color || "var(--text-muted)" }}
+                        >
+                          {task.status.status}
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="suggestion-play">
                     <path d="M8 5v14l11-7z" />
