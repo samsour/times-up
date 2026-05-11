@@ -11,9 +11,9 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            artifact: '*.dmg'
+            build_cmd: npm run build:mac
           - os: windows-latest
-            artifact: '*.exe'
+            build_cmd: npm run build:win
 
     runs-on: ${{ matrix.os }}
 
@@ -22,20 +22,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Build & publish
+        run: ${{ matrix.build_cmd }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release/${{ matrix.artifact }}
-          draft: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
