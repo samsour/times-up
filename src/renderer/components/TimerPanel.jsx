@@ -1,23 +1,21 @@
 import { useState, useEffect } from 'react'
-import { startTimer, stopTimer, updateTimeEntry, getTimeEntries } from '../lib/clickup.js'
+import { startTimer, stopTimer, updateTimeEntry, getTimeEntries, getMyTasks } from '../lib/clickup.js'
 import { formatDuration, formatDurationShort, endOfDay } from '../lib/time.js'
 import './TimerPanel.css'
 
-export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickTask, onClearTask, onChange }) {
+export default function TimerPanel({ teamId, userId, currentEntry, onBrowse, onChange }) {
   const [elapsed, setElapsed] = useState(0)
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [suggestedTasks, setSuggestedTasks] = useState([])
   const [lastEntry, setLastEntry] = useState(null)
 
   const isRunning = !!currentEntry
 
-  // Tick elapsed time when running
+  // Tick elapsed time
   useEffect(() => {
-    if (!isRunning) {
-      setElapsed(0)
-      return
-    }
+    if (!isRunning) { setElapsed(0); return }
     const startMs = parseInt(currentEntry.start)
     const update = () => setElapsed(Date.now() - startMs)
     update()
@@ -25,14 +23,19 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
     return () => clearInterval(interval)
   }, [isRunning, currentEntry])
 
-  // Sync description from running entry when a new timer starts
+  // Sync description from running entry
   useEffect(() => {
     if (currentEntry?.id) setDescription(currentEntry.description || '')
   }, [currentEntry?.id])
 
-  // Fetch last completed entry
+  // Fetch suggestions + last entry when idle
   useEffect(() => {
     if (isRunning) return
+    if (userId) {
+      getMyTasks(teamId, userId)
+        .then(tasks => setSuggestedTasks(tasks.slice(0, 5)))
+        .catch(() => {})
+    }
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
     getTimeEntries(teamId, sevenDaysAgo, endOfDay())
       .then(data => {
@@ -40,26 +43,7 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
         setLastEntry(sorted[0] || null)
       })
       .catch(() => {})
-  }, [teamId, isRunning])
-
-  // Show task from running timer if available
-  const displayTask = currentEntry?.task
-    ? { id: currentEntry.task.id, name: currentEntry.task.name }
-    : selectedTask
-
-  async function handleStart() {
-    setBusy(true)
-    setError('')
-    try {
-      await startTimer(teamId, selectedTask?.id || null, description)
-      setDescription('')
-      onChange()
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setBusy(false)
-    }
-  }
+  }, [teamId, userId, isRunning])
 
   async function handleStop() {
     setBusy(true)
@@ -74,12 +58,25 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
     }
   }
 
+  async function startWithTask(taskId, desc = '') {
+    setBusy(true)
+    setError('')
+    try {
+      await startTimer(teamId, taskId, desc)
+      onChange()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="timer-panel">
-      {/* Main action button */}
+      {/* Start / Stop */}
       <button
         className={`timer-action ${isRunning ? 'timer-action-stop' : 'timer-action-start'}`}
-        onClick={isRunning ? handleStop : handleStart}
+        onClick={isRunning ? handleStop : () => startWithTask(null, description)}
         disabled={busy}
       >
         {busy ? '...' : isRunning ? (
@@ -94,12 +91,12 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z" />
             </svg>
-            Start
+            Start unassigned
           </>
         )}
       </button>
 
-      {/* Big clock */}
+      {/* Clock */}
       <div className="timer-display">
         <div className={`timer-time ${isRunning ? 'timer-time-running' : ''}`}>
           {formatDuration(elapsed)}
@@ -108,7 +105,7 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
           {isRunning ? (
             <>
               <span className="status-dot status-running" />
-              <span>tracking</span>
+              <span>{currentEntry.task?.name || 'unassigned'}</span>
             </>
           ) : (
             <>
@@ -119,25 +116,7 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
         </div>
       </div>
 
-      {/* Task selector */}
-      <button className="task-selector" onClick={onPickTask}>
-        <div className="task-selector-label">
-          {displayTask ? 'Working on' : 'Pick a task'}
-        </div>
-        <div className="task-selector-name">
-          {displayTask?.name || (
-            <span className="task-selector-placeholder">Browse Space → List → Task</span>
-          )}
-        </div>
-        <svg className="task-selector-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M9 6l6 6-6 6" />
-        </svg>
-      </button>
-
-      {!isRunning && selectedTask && (
-        <button className="task-clear" onClick={onClearTask}>× clear task</button>
-      )}
-
+      {/* Notes */}
       <input
         className="timer-description"
         placeholder="Notes... (optional)"
@@ -153,15 +132,42 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
 
       {error && <div className="timer-error">{error}</div>}
 
+      {/* Suggested tasks — only when idle */}
+      {!isRunning && (
+        <div className="suggestions">
+          <div className="suggestions-header">
+            <span className="suggestions-label">your tasks</span>
+            <button className="suggestions-browse" onClick={onBrowse}>Browse all →</button>
+          </div>
+          {suggestedTasks.length === 0 && !userId && (
+            <div className="suggestions-empty">Sign out and back in to enable quick tasks.</div>
+          )}
+          {suggestedTasks.length === 0 && userId && (
+            <div className="suggestions-empty">No open tasks assigned to you.</div>
+          )}
+          {suggestedTasks.map(task => (
+            <button key={task.id} className="suggestion-item" onClick={() => startWithTask(task.id)}>
+              <div className="suggestion-info">
+                <span className="suggestion-name">{task.name}</span>
+                {task.status?.status && (
+                  <span className="suggestion-status" style={{ color: task.status.color || 'var(--text-muted)' }}>
+                    {task.status.status}
+                  </span>
+                )}
+              </div>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="suggestion-play">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Last entry quick-start */}
       {!isRunning && lastEntry && (
         <button
           className="last-entry"
-          onClick={async () => {
-            try {
-              await startTimer(teamId, lastEntry.task?.id || null, lastEntry.description || '')
-              onChange()
-            } catch (e) { setError(e.message) }
-          }}
+          onClick={() => startWithTask(lastEntry.task?.id || null, lastEntry.description || '')}
         >
           <div className="last-entry-info">
             <span className="last-entry-label">last</span>

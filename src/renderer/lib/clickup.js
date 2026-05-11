@@ -93,6 +93,24 @@ export async function deleteTimeEntry(teamId, entryId) {
   })
 }
 
+export async function searchTasks(teamId, query) {
+  const { tasks } = await api.request({
+    path: `/team/${teamId}/task?name=${encodeURIComponent(query)}&include_closed=false&page=0`
+  })
+  return tasks || []
+}
+
+export async function getMyTasks(teamId, userId) {
+  try {
+    const { tasks } = await api.request({
+      path: `/team/${teamId}/task?assignees[]=${userId}&include_closed=false&order_by=updated&reverse=true&page=0`
+    })
+    return tasks || []
+  } catch {
+    return []
+  }
+}
+
 export async function updateTimeEntry(teamId, entryId, body) {
   return api.request({
     method: 'PUT',
