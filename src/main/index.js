@@ -74,6 +74,39 @@ function toggleWindow() {
   }
 }
 
+let activeTimer = null // { start: number, label: string }
+
+async function syncTimer() {
+  const token = store.get('clickup_token')
+  const teamId = store.get('team_id')
+  if (!token || !teamId) { activeTimer = null; updateTrayTitle(); return }
+  try {
+    const res = await fetch(`https://api.clickup.com/api/v2/team/${teamId}/time_entries/current`, {
+      headers: { Authorization: token }
+    })
+    const { data } = await res.json()
+    activeTimer = data
+      ? { start: parseInt(data.start), label: (data.task?.name || data.description || '').slice(0, 30) }
+      : null
+  } catch {
+    activeTimer = null
+  }
+  updateTrayTitle()
+}
+
+function updateTrayTitle() {
+  if (!tray) return
+  if (activeTimer) {
+    const sec = Math.floor((Date.now() - activeTimer.start) / 1000)
+    const h = Math.floor(sec / 3600).toString().padStart(2, '0')
+    const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0')
+    const s = (sec % 60).toString().padStart(2, '0')
+    tray.setTitle(activeTimer.label ? `${h}:${m}:${s}  ${activeTimer.label}` : `${h}:${m}:${s}`)
+  } else {
+    tray.setTitle('not tracking rn')
+  }
+}
+
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, '../../src/assets/icon.png'))
     .resize({ width: 18, height: 18 })
@@ -83,14 +116,9 @@ function createTray() {
   tray.setToolTip('ClickUp Tracker')
   tray.on('click', toggleWindow)
 
-  function updateClock() {
-    const now = new Date()
-    const h = now.getHours().toString().padStart(2, '0')
-    const m = now.getMinutes().toString().padStart(2, '0')
-    tray.setTitle(`${h}:${m}`)
-  }
-  updateClock()
-  setInterval(updateClock, 10_000)
+  syncTimer()
+  setInterval(updateTrayTitle, 1000)
+  setInterval(syncTimer, 10_000)
 
   // Right-click menu for quitting
   tray.on('right-click', () => {
