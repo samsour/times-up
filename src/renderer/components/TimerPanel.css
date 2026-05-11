@@ -158,7 +158,6 @@
 }
 
 .timer-action {
-  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -195,4 +194,64 @@
 .timer-action-stop:hover:not(:disabled) {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+.last-entry {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.last-entry:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+.last-entry:hover .last-entry-play {
+  color: var(--success);
+}
+
+.last-entry-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.last-entry-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.last-entry-name {
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.last-entry-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.last-entry-play {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 0.12s;
 }

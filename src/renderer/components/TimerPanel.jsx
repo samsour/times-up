@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { startTimer, stopTimer, updateTimeEntry } from '../lib/clickup.js'
-import { formatDuration } from '../lib/time.js'
+import { startTimer, stopTimer, updateTimeEntry, getTimeEntries } from '../lib/clickup.js'
+import { formatDuration, formatDurationShort, endOfDay } from '../lib/time.js'
 import './TimerPanel.css'
 
 export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickTask, onClearTask, onChange }) {
@@ -8,6 +8,7 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [lastEntry, setLastEntry] = useState(null)
 
   const isRunning = !!currentEntry
 
@@ -28,6 +29,18 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
   useEffect(() => {
     if (currentEntry?.id) setDescription(currentEntry.description || '')
   }, [currentEntry?.id])
+
+  // Fetch last completed entry
+  useEffect(() => {
+    if (isRunning) return
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    getTimeEntries(teamId, sevenDaysAgo, endOfDay())
+      .then(data => {
+        const sorted = (data || []).sort((a, b) => parseInt(b.start) - parseInt(a.start))
+        setLastEntry(sorted[0] || null)
+      })
+      .catch(() => {})
+  }, [teamId, isRunning])
 
   // Show task from running timer if available
   const displayTask = currentEntry?.task
@@ -85,6 +98,84 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
           </>
         )}
       </button>
+
+      {/* Big clock */}
+      <div className="timer-display">
+        <div className={`timer-time ${isRunning ? 'timer-time-running' : ''}`}>
+          {formatDuration(elapsed)}
+        </div>
+        <div className="timer-status">
+          {isRunning ? (
+            <>
+              <span className="status-dot status-running" />
+              <span>tracking</span>
+            </>
+          ) : (
+            <>
+              <span className="status-dot" />
+              <span>stopped</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Task selector */}
+      <button className="task-selector" onClick={onPickTask}>
+        <div className="task-selector-label">
+          {displayTask ? 'Working on' : 'Pick a task'}
+        </div>
+        <div className="task-selector-name">
+          {displayTask?.name || (
+            <span className="task-selector-placeholder">Browse Space → List → Task</span>
+          )}
+        </div>
+        <svg className="task-selector-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </button>
+
+      {!isRunning && selectedTask && (
+        <button className="task-clear" onClick={onClearTask}>× clear task</button>
+      )}
+
+      <input
+        className="timer-description"
+        placeholder="Notes... (optional)"
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+        onBlur={async () => {
+          if (isRunning && currentEntry?.id) {
+            try { await updateTimeEntry(teamId, currentEntry.id, { description }) } catch {}
+          }
+        }}
+        maxLength={200}
+      />
+
+      {error && <div className="timer-error">{error}</div>}
+
+      {!isRunning && lastEntry && (
+        <button
+          className="last-entry"
+          onClick={async () => {
+            try {
+              await startTimer(teamId, lastEntry.task?.id || null, lastEntry.description || '')
+              onChange()
+            } catch (e) { setError(e.message) }
+          }}
+        >
+          <div className="last-entry-info">
+            <span className="last-entry-label">last</span>
+            <span className="last-entry-name">{lastEntry.task?.name || lastEntry.description || 'Unassigned'}</span>
+            <span className="last-entry-meta">
+              {new Date(parseInt(lastEntry.start)).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+              {' · '}{formatDurationShort(parseInt(lastEntry.duration))} tracked
+            </span>
+          </div>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="last-entry-play">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }
