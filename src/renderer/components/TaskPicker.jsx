@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react'
-import { getSpaces, getFolders, getFolderlessLists, getListsInFolder, getTasks } from '../lib/clickup.js'
+import { useState, useEffect, useRef } from 'react'
+import { getSpaces, getFolders, getFolderlessLists, getListsInFolder, getTasks, searchTasks } from '../lib/clickup.js'
 import './TaskPicker.css'
 
 export default function TaskPicker({ teamId, onPick, onCancel }) {
-  // breadcrumb: [{ type: 'team', name }, { type: 'space', id, name }, ...]
   const [crumbs, setCrumbs] = useState([{ type: 'team', name: 'Spaces' }])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [searchResults, setSearchResults] = useState(null) // null = not searching
+  const [searching, setSearching] = useState(false)
   const [error, setError] = useState('')
+  const debounceRef = useRef(null)
 
   const current = crumbs[crumbs.length - 1]
 
@@ -16,6 +18,24 @@ export default function TaskPicker({ teamId, onPick, onCancel }) {
     loadCurrent()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crumbs])
+
+  // Debounced API search
+  useEffect(() => {
+    clearTimeout(debounceRef.current)
+    if (!search.trim()) { setSearchResults(null); return }
+    setSearching(true)
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const tasks = await searchTasks(teamId, search.trim())
+        setSearchResults(tasks)
+      } catch {
+        setSearchResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 350)
+    return () => clearTimeout(debounceRef.current)
+  }, [search, teamId])
 
   async function loadCurrent() {
     setLoading(true)
@@ -69,9 +89,7 @@ export default function TaskPicker({ teamId, onPick, onCancel }) {
     setCrumbs(crumbs.slice(0, idx + 1))
   }
 
-  const filtered = items.filter(i =>
-    i.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const isSearching = search.trim().length > 0
 
   return (
     <div className="picker">
@@ -83,40 +101,39 @@ export default function TaskPicker({ teamId, onPick, onCancel }) {
         </button>
         <input
           className="picker-search"
-          placeholder={`Filter ${current.type === 'list' ? 'tasks' : 'items'}…`}
+          placeholder="Search tasks..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           autoFocus
         />
       </div>
 
-      <div className="picker-crumbs">
-        {crumbs.map((c, i) => (
-          <span key={i} className="crumb-group">
-            <button
-              className={`crumb ${i === crumbs.length - 1 ? 'crumb-active' : ''}`}
-              onClick={() => jumpTo(i)}
-            >
-              {c.name}
-            </button>
-            {i < crumbs.length - 1 && <span className="crumb-sep">›</span>}
-          </span>
-        ))}
-      </div>
+      {!isSearching && (
+        <div className="picker-crumbs">
+          {crumbs.map((c, i) => (
+            <span key={i} className="crumb-group">
+              <button
+                className={`crumb ${i === crumbs.length - 1 ? 'crumb-active' : ''}`}
+                onClick={() => jumpTo(i)}
+              >
+                {c.name}
+              </button>
+              {i < crumbs.length - 1 && <span className="crumb-sep">›</span>}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="picker-list">
-        {loading && <div className="picker-loading">Loading…</div>}
-        {error && <div className="picker-error">{error}</div>}
-        {!loading && !error && filtered.length === 0 && (
-          <div className="picker-empty">
-            {current.type === 'list' ? 'No open tasks here.' : 'Nothing in here.'}
-          </div>
+        {/* Normal drill-down mode */}
+        {!isSearching && loading && <div className="picker-loading">Loading…</div>}
+        {!isSearching && error && <div className="picker-error">{error}</div>}
+        {!isSearching && !loading && !error && items.length === 0 && (
+          <div className="picker-empty">Nothing in here.</div>
         )}
-        {!loading && filtered.map(item => (
+        {!isSearching && !loading && items.map(item => (
           <button key={`${item.kind}-${item.id}`} className="picker-item" onClick={() => drill(item)}>
-            <span className={`picker-icon picker-icon-${item.kind}`}>
-              {iconFor(item.kind)}
-            </span>
+            <span className={`picker-icon picker-icon-${item.kind}`}>{iconFor(item.kind)}</span>
             <span className="picker-item-name">{item.name}</span>
             {item.status && (
               <span className="picker-status" style={{ color: item.statusColor || 'var(--text-muted)' }}>
@@ -127,6 +144,32 @@ export default function TaskPicker({ teamId, onPick, onCancel }) {
               <svg className="picker-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 6l6 6-6 6" />
               </svg>
+            )}
+          </button>
+        ))}
+
+        {/* Search results mode */}
+        {isSearching && searching && <div className="picker-loading">Searching…</div>}
+        {isSearching && !searching && searchResults?.length === 0 && (
+          <div className="picker-empty">No tasks found.</div>
+        )}
+        {isSearching && !searching && searchResults?.map(task => (
+          <button
+            key={task.id}
+            className="picker-item"
+            onClick={() => onPick({ id: task.id, name: task.name })}
+          >
+            <span className="picker-icon picker-icon-task">{iconFor('task')}</span>
+            <span className="picker-item-info">
+              <span className="picker-item-name">{task.name}</span>
+              {task.list?.name && (
+                <span className="picker-item-context">{task.space?.name} / {task.list.name}</span>
+              )}
+            </span>
+            {task.status?.status && (
+              <span className="picker-status" style={{ color: task.status.color || 'var(--text-muted)' }}>
+                {task.status.status}
+              </span>
             )}
           </button>
         ))}

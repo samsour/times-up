@@ -3,16 +3,14 @@ import TimerPanel from './TimerPanel.jsx'
 import TaskPicker from './TaskPicker.jsx'
 import History from './History.jsx'
 import ManualEntry from './ManualEntry.jsx'
-import { getCurrentTimer } from '../lib/clickup.js'
+import { getCurrentTimer, startTimer, updateTimeEntry } from '../lib/clickup.js'
 import './Tracker.css'
 
-export default function Tracker({ teamId, onReset }) {
-  const [view, setView] = useState('timer') // 'timer' | 'picker' | 'history' | 'manual'
+export default function Tracker({ teamId, userId, onReset }) {
+  const [view, setView] = useState('timer') // 'timer' | 'tasks' | 'manual' | 'history'
   const [currentEntry, setCurrentEntry] = useState(null)
-  const [selectedTask, setSelectedTask] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Poll current running timer (in case started from ClickUp web)
   const refreshCurrent = useCallback(async () => {
     try {
       const entry = await getCurrentTimer(teamId)
@@ -28,27 +26,29 @@ export default function Tracker({ teamId, onReset }) {
     return () => clearInterval(interval)
   }, [refreshCurrent])
 
-  // Restore last picked task
-  useEffect(() => {
-    window.api.store.get('last_task').then(t => t && setSelectedTask(t))
-  }, [])
-
-  function pickTask(task) {
-    setSelectedTask(task)
-    window.api.store.set('last_task', task)
-    setView('timer')
-  }
-
   function bumpRefresh() {
     setRefreshKey(k => k + 1)
     refreshCurrent()
   }
 
+  async function handleBrowsePick(task) {
+    try {
+      if (currentEntry?.id && !currentEntry.task) {
+        await updateTimeEntry(teamId, currentEntry.id, { tid: task.id })
+      } else {
+        await startTimer(teamId, task.id, '')
+      }
+      bumpRefresh()
+    } catch {}
+    setView('timer')
+  }
+
   return (
     <div className="tracker">
       <header className="tracker-header">
-<div className="tracker-tabs">
+        <div className="tracker-tabs">
           <TabBtn active={view === 'timer'} onClick={() => setView('timer')}>Timer</TabBtn>
+          <TabBtn active={view === 'tasks'} onClick={() => setView('tasks')}>Tasks</TabBtn>
           <TabBtn active={view === 'manual'} onClick={() => setView('manual')}>Add</TabBtn>
           <TabBtn active={view === 'history'} onClick={() => setView('history')}>Log</TabBtn>
         </div>
@@ -63,25 +63,24 @@ export default function Tracker({ teamId, onReset }) {
         {view === 'timer' && (
           <TimerPanel
             teamId={teamId}
-            selectedTask={selectedTask}
+            userId={userId}
             currentEntry={currentEntry}
-            onPickTask={() => setView('picker')}
-            onClearTask={() => { setSelectedTask(null); window.api.store.delete('last_task') }}
+            onBrowse={() => setView('tasks')}
             onChange={bumpRefresh}
           />
         )}
-        {view === 'picker' && (
+        {view === 'tasks' && (
           <TaskPicker
             teamId={teamId}
-            onPick={pickTask}
+            onPick={handleBrowsePick}
             onCancel={() => setView('timer')}
           />
         )}
         {view === 'manual' && (
           <ManualEntry
             teamId={teamId}
-            selectedTask={selectedTask}
-            onPickTask={() => setView('picker')}
+            selectedTask={null}
+            onPickTask={() => setView('tasks')}
             onSaved={() => { bumpRefresh(); setView('history') }}
           />
         )}

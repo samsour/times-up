@@ -146,6 +146,26 @@
   text-overflow: ellipsis;
 }
 
+.picker-item-info .picker-item-name {
+  flex: none;
+}
+
+.picker-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.picker-item-context {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .picker-status {
   font-size: 9.5px;
   text-transform: uppercase;

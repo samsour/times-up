@@ -27,6 +27,10 @@ export default function Setup({ onComplete }) {
 
   async function pickTeam(team) {
     await window.api.store.set('team_id', team.id)
+    try {
+      const { user } = await window.api.clickup.request({ path: '/user' })
+      await window.api.store.set('user_id', user.id)
+    } catch {}
     onComplete(token, team.id)
   }
 
