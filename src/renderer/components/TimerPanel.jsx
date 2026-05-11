@@ -1,73 +1,95 @@
-import { useState, useEffect } from 'react'
-import { startTimer, stopTimer, updateTimeEntry, getTimeEntries, getMyTasks } from '../lib/clickup.js'
-import { formatDuration, formatDurationShort, endOfDay } from '../lib/time.js'
-import './TimerPanel.css'
+import { useState, useEffect } from "react";
+import {
+  startTimer,
+  stopTimer,
+  updateTimeEntry,
+  getTimeEntries,
+  getMyTasks,
+} from "../lib/clickup.js";
+import { formatDuration, formatDurationShort, endOfDay } from "../lib/time.js";
+import "./TimerPanel.css";
 
-export default function TimerPanel({ teamId, userId, currentEntry, onBrowse, onChange }) {
-  const [elapsed, setElapsed] = useState(0)
-  const [description, setDescription] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [suggestedTasks, setSuggestedTasks] = useState([])
-  const [lastEntry, setLastEntry] = useState(null)
+export default function TimerPanel({
+  teamId,
+  userId,
+  currentEntry,
+  onBrowse,
+  onChange,
+}) {
+  const [elapsed, setElapsed] = useState(0);
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [suggestedTasks, setSuggestedTasks] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [lastEntry, setLastEntry] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const isRunning = !!currentEntry
+  const isRunning = !!currentEntry;
 
   // Tick elapsed time
   useEffect(() => {
-    if (!isRunning) { setElapsed(0); return }
-    const startMs = parseInt(currentEntry.start)
-    const update = () => setElapsed(Date.now() - startMs)
-    update()
-    const interval = setInterval(update, 1000)
-    return () => clearInterval(interval)
-  }, [isRunning, currentEntry])
+    if (!isRunning) {
+      setElapsed(0);
+      return;
+    }
+    const startMs = parseInt(currentEntry.start);
+    const update = () => setElapsed(Date.now() - startMs);
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning, currentEntry]);
 
   // Sync description from running entry
   useEffect(() => {
-    if (currentEntry?.id) setDescription(currentEntry.description || '')
-  }, [currentEntry?.id])
+    if (currentEntry?.id) setDescription(currentEntry.description || "");
+  }, [currentEntry?.id]);
 
   // Fetch suggestions + last entry when idle
   useEffect(() => {
-    if (isRunning) return
+    if (isRunning) return;
     if (userId) {
+      setSuggestionsLoading(true);
       getMyTasks(teamId, userId)
-        .then(tasks => setSuggestedTasks(tasks.slice(0, 5)))
+        .then((tasks) => setSuggestedTasks(tasks.slice(0, 5)))
         .catch(() => {})
+        .finally(() => setSuggestionsLoading(false));
     }
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     getTimeEntries(teamId, sevenDaysAgo, endOfDay())
-      .then(data => {
-        const sorted = (data || []).sort((a, b) => parseInt(b.start) - parseInt(a.start))
-        setLastEntry(sorted[0] || null)
+      .then((data) => {
+        const sorted = (data || []).sort(
+          (a, b) => parseInt(b.start) - parseInt(a.start)
+        );
+        setLastEntry(sorted[0] || null);
       })
-      .catch(() => {})
-  }, [teamId, userId, isRunning])
+      .catch(() => {});
+  }, [teamId, userId, isRunning]);
 
   async function handleStop() {
-    setBusy(true)
-    setError('')
+    setBusy(true);
+    setError("");
     try {
-      await stopTimer(teamId)
-      onChange()
+      await stopTimer(teamId);
+      onChange();
     } catch (e) {
-      setError(e.message)
+      setError(e.message);
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
   }
 
-  async function startWithTask(taskId, desc = '') {
-    setBusy(true)
-    setError('')
+  async function startWithTask(taskId, desc = "") {
+    setBusy(true);
+    setError("");
     try {
-      await startTimer(teamId, taskId, desc)
-      onChange()
+      await startTimer(teamId, taskId, desc);
+      setShowSuggestions(false);
+      onChange();
     } catch (e) {
-      setError(e.message)
+      setError(e.message);
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
   }
 
@@ -75,11 +97,17 @@ export default function TimerPanel({ teamId, userId, currentEntry, onBrowse, onC
     <div className="timer-panel">
       {/* Start / Stop */}
       <button
-        className={`timer-action ${isRunning ? 'timer-action-stop' : 'timer-action-start'}`}
-        onClick={isRunning ? handleStop : () => startWithTask(null, description)}
+        className={`timer-action ${
+          isRunning ? "timer-action-stop" : "timer-action-start"
+        }`}
+        onClick={
+          isRunning ? handleStop : () => startWithTask(null, description)
+        }
         disabled={busy}
       >
-        {busy ? '...' : isRunning ? (
+        {busy ? (
+          "..."
+        ) : isRunning ? (
           <>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="6" width="12" height="12" rx="1" />
@@ -98,14 +126,14 @@ export default function TimerPanel({ teamId, userId, currentEntry, onBrowse, onC
 
       {/* Clock */}
       <div className="timer-display">
-        <div className={`timer-time ${isRunning ? 'timer-time-running' : ''}`}>
+        <div className={`timer-time ${isRunning ? "timer-time-running" : ""}`}>
           {formatDuration(elapsed)}
         </div>
         <div className="timer-status">
           {isRunning ? (
             <>
               <span className="status-dot status-running" />
-              <span>{currentEntry.task?.name || 'unassigned'}</span>
+              <span>{currentEntry.task?.name || "unassigned"}</span>
             </>
           ) : (
             <>
@@ -119,12 +147,14 @@ export default function TimerPanel({ teamId, userId, currentEntry, onBrowse, onC
       {/* Notes */}
       <input
         className="timer-description"
-        placeholder="Notes... (optional)"
+        placeholder="Notes..."
         value={description}
-        onChange={e => setDescription(e.target.value)}
+        onChange={(e) => setDescription(e.target.value)}
         onBlur={async () => {
           if (isRunning && currentEntry?.id) {
-            try { await updateTimeEntry(teamId, currentEntry.id, { description }) } catch {}
+            try {
+              await updateTimeEntry(teamId, currentEntry.id, { description });
+            } catch {}
           }
         }}
         maxLength={200}
@@ -132,56 +162,116 @@ export default function TimerPanel({ teamId, userId, currentEntry, onBrowse, onC
 
       {error && <div className="timer-error">{error}</div>}
 
-      {/* Suggested tasks — only when idle */}
+      {/* Assign task button + collapsible suggestions */}
       {!isRunning && (
-        <div className="suggestions">
-          <div className="suggestions-header">
-            <span className="suggestions-label">your tasks</span>
-            <button className="suggestions-browse" onClick={onBrowse}>Browse all →</button>
-          </div>
-          {suggestedTasks.length === 0 && !userId && (
-            <div className="suggestions-empty">Sign out and back in to enable quick tasks.</div>
+        <>
+          <button
+            className={`task-assign-btn ${
+              showSuggestions ? "task-assign-btn-open" : ""
+            }`}
+            onClick={() => setShowSuggestions((v) => !v)}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M9 11l3 3 8-8M20 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h11" />
+            </svg>
+            Assign a task
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="task-assign-chev"
+            >
+              <path d={showSuggestions ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"} />
+            </svg>
+          </button>
+
+          {showSuggestions && (
+            <div className="suggestions">
+              {suggestionsLoading && (
+                <div className="suggestions-loading">Loading tasks…</div>
+              )}
+              {!suggestionsLoading && suggestedTasks.map((task) => (
+                <button
+                  key={task.id}
+                  className="suggestion-item"
+                  onClick={() => startWithTask(task.id)}
+                >
+                  <div className="suggestion-info">
+                    <span className="suggestion-name">{task.name}</span>
+                    {task.status?.status && (
+                      <span
+                        className="suggestion-status"
+                        style={{ color: task.status.color || "var(--text-muted)" }}
+                      >
+                        {task.status.status}
+                      </span>
+                    )}
+                  </div>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="suggestion-play">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </button>
+              ))}
+              <button
+                className="suggestions-browse"
+                onClick={() => {
+                  setShowSuggestions(false);
+                  onBrowse();
+                }}
+              >
+                Browse all tasks →
+              </button>
+            </div>
           )}
-          {suggestedTasks.length === 0 && userId && (
-            <div className="suggestions-empty">No open tasks assigned to you.</div>
-          )}
-          {suggestedTasks.map(task => (
-            <button key={task.id} className="suggestion-item" onClick={() => startWithTask(task.id)}>
-              <div className="suggestion-info">
-                <span className="suggestion-name">{task.name}</span>
-                {task.status?.status && (
-                  <span className="suggestion-status" style={{ color: task.status.color || 'var(--text-muted)' }}>
-                    {task.status.status}
-                  </span>
-                )}
-              </div>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="suggestion-play">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </button>
-          ))}
-        </div>
+        </>
       )}
 
       {/* Last entry quick-start */}
       {!isRunning && lastEntry && (
         <button
           className="last-entry"
-          onClick={() => startWithTask(lastEntry.task?.id || null, lastEntry.description || '')}
+          onClick={() =>
+            startWithTask(
+              lastEntry.task?.id || null,
+              lastEntry.description || ""
+            )
+          }
         >
           <div className="last-entry-info">
             <span className="last-entry-label">last</span>
-            <span className="last-entry-name">{lastEntry.task?.name || lastEntry.description || 'Unassigned'}</span>
+            <span className="last-entry-name">
+              {lastEntry.task?.name || lastEntry.description || "Unassigned"}
+            </span>
             <span className="last-entry-meta">
-              {new Date(parseInt(lastEntry.start)).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-              {' · '}{formatDurationShort(parseInt(lastEntry.duration))} tracked
+              {new Date(parseInt(lastEntry.start)).toLocaleTimeString(
+                undefined,
+                { hour: "numeric", minute: "2-digit" }
+              )}
+              {" · "}
+              {formatDurationShort(parseInt(lastEntry.duration))} tracked
             </span>
           </div>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="last-entry-play">
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="last-entry-play"
+          >
             <path d="M8 5v14l11-7z" />
           </svg>
         </button>
       )}
     </div>
-  )
+  );
 }

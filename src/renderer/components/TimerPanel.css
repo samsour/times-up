@@ -131,42 +131,47 @@
   color: var(--danger);
 }
 
+.task-assign-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.task-assign-btn:hover,
+.task-assign-btn-open {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.task-assign-chev {
+  margin-left: auto;
+}
+
 .suggestions {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.suggestions-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 4px 4px;
-}
-
-.suggestions-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--text-muted);
-  font-weight: 600;
+  padding: 4px 0;
 }
 
 .suggestions-browse {
   font-size: 11px;
   color: var(--text-muted);
+  padding: 7px 10px;
+  text-align: left;
   transition: color 0.12s;
 }
 
 .suggestions-browse:hover {
   color: var(--text);
-}
-
-.suggestions-empty {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-style: italic;
-  padding: 8px 4px;
 }
 
 .suggestion-item {
