@@ -7,7 +7,7 @@ import {
   getMyTasks,
   getTask,
 } from "../lib/clickup.js";
-import { formatDuration, formatDurationShort, endOfDay } from "../lib/time.js";
+import { formatDuration, formatDurationShort, startOfDay, endOfDay } from "../lib/time.js";
 import "./TimerPanel.css";
 
 export default function TimerPanel({
@@ -26,6 +26,8 @@ export default function TimerPanel({
   const [lastEntry, setLastEntry] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [taskDetail, setTaskDetail] = useState(null);
+  const [capacity, setCapacity] = useState(0);
+  const [completedToday, setCompletedToday] = useState(0);
 
   const isRunning = !!currentEntry;
 
@@ -41,6 +43,23 @@ export default function TimerPanel({
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [isRunning, currentEntry]);
+
+  // Read daily goal from local settings
+  useEffect(() => {
+    window.api.store.get('daily_goal_hours').then(h => setCapacity((h || 0) * 3600000));
+  }, []);
+
+  // Fetch today's completed total whenever the running entry changes
+  useEffect(() => {
+    getTimeEntries(teamId, startOfDay(), endOfDay())
+      .then(data => {
+        const ms = (data || [])
+          .filter(e => !currentEntry || e.id !== currentEntry.id)
+          .reduce((sum, e) => sum + parseInt(e.duration || 0), 0);
+        setCompletedToday(ms);
+      })
+      .catch(() => {});
+  }, [teamId, currentEntry?.id]);
 
   // Sync description from running entry
   useEffect(() => {
@@ -187,6 +206,27 @@ export default function TimerPanel({
           )}
         </div>
       </div>
+
+      {/* Daily progress */}
+      {capacity > 0 && (() => {
+        const total = completedToday + (isRunning ? elapsed : 0);
+        const pct = Math.min(total / capacity, 1);
+        const done = pct >= 1;
+        return (
+          <div className="daily-progress">
+            <div className="daily-progress-labels">
+              <span className="daily-progress-today">{formatDurationShort(total)}</span>
+              <span className="daily-progress-goal">{formatDurationShort(capacity)}</span>
+            </div>
+            <div className="daily-progress-track">
+              <div
+                className={`daily-progress-fill${done ? ' daily-progress-fill-done' : ''}`}
+                style={{ width: `${pct * 100}%` }}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Notes */}
       <input

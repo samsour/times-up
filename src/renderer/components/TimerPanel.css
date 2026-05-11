@@ -341,3 +341,48 @@
   flex-shrink: 0;
   transition: color 0.12s;
 }
+
+.daily-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.daily-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.daily-progress-today {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-progress-goal {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-progress-track {
+  height: 3px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.daily-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.daily-progress-fill-done {
+  background: var(--success);
+}

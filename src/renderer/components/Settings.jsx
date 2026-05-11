@@ -6,12 +6,14 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
   const [idleDetection, setIdleDetection] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
+  const [dailyGoalHours, setDailyGoalHours] = useState('')
 
   useEffect(() => {
     window.api.app.getLoginItemSettings().then(setAutoLaunch)
     window.api.store.get('idleDetection').then(v => setIdleDetection(!!v))
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
+    window.api.store.get('daily_goal_hours').then(v => setDailyGoalHours(v || ''))
   }, [])
 
   async function handleIdleText(val) {
@@ -120,6 +122,34 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
             </div>
           </div>
         )}
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-label">Tracking</div>
+        <div className="settings-row">
+          <span className="settings-row-title">Daily goal</span>
+          <div className="settings-number-row">
+            <input
+              className="settings-number"
+              type="number"
+              min="1"
+              max="24"
+              placeholder="—"
+              value={dailyGoalHours}
+              onChange={async e => {
+                const raw = e.target.value
+                setDailyGoalHours(raw)
+                const h = parseFloat(raw)
+                if (raw === '' || isNaN(h)) {
+                  await window.api.store.delete('daily_goal_hours')
+                } else {
+                  await window.api.store.set('daily_goal_hours', Math.min(24, Math.max(0.5, h)))
+                }
+              }}
+            />
+            <span className="settings-number-unit">h / day</span>
+          </div>
+        </div>
       </div>
 
       <div className="settings-section">

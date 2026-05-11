@@ -116,7 +116,7 @@ src/
 - [ ] **Time rounding** — round stopped entries to the nearest 5/10/15 minutes (configurable); useful for billing workflows
 - [ ] **Billable flag** — ClickUp's time entry API supports a `billable` boolean; expose a toggle in the timer and manual entry screens
 - [ ] **Tags** — ClickUp time entries support tags; add a tag selector to the timer and manual entry screens
-- [ ] **Daily goal** — read the user's capacity from `GET /team/{id}` (member `capacity` field, in ms); use it as the daily target and show a progress bar in the tray title or window
+- [x] **Daily goal** — reads the user's capacity from `GET /team/{id}` (member `capacity` field, in ms); shows a progress bar with today's total below the timer clock; turns green when goal is reached
 - [ ] **Weekly summary** — a read-only report view breaking down tracked time by Space or List over the last 7 days
 - [ ] **CSV export** — dump the current log view to a `.csv` file for use in invoicing tools
 
