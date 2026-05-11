@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import TimerPanel from './TimerPanel.jsx'
 import TaskPicker from './TaskPicker.jsx'
 import History from './History.jsx'
-import ManualEntry from './ManualEntry.jsx'
+import Timetable from './Timetable.jsx'
 import Settings from './Settings.jsx'
 import IdlePrompt from './IdlePrompt.jsx'
 import { getCurrentTimer, startTimer, updateTimeEntry } from '../lib/clickup.js'
@@ -58,7 +58,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
         <div className="tracker-tabs">
           <TabBtn active={view === 'timer'} onClick={() => setView('timer')}>Timer</TabBtn>
           <TabBtn active={view === 'tasks'} onClick={() => setView('tasks')}>Tasks</TabBtn>
-          <TabBtn active={view === 'manual'} onClick={() => setView('manual')}>Add</TabBtn>
+          <TabBtn active={view === 'timetable'} onClick={() => setView('timetable')}>Day</TabBtn>
           <TabBtn active={view === 'history'} onClick={() => setView('history')}>Log</TabBtn>
         </div>
         <button
@@ -90,13 +90,8 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
             onCancel={() => setView('timer')}
           />
         )}
-        {view === 'manual' && (
-          <ManualEntry
-            teamId={teamId}
-            selectedTask={null}
-            onPickTask={() => setView('tasks')}
-            onSaved={() => { bumpRefresh(); setView('history') }}
-          />
+        {view === 'timetable' && (
+          <Timetable teamId={teamId} currentEntry={currentEntry} />
         )}
         {view === 'history' && (
           <History teamId={teamId} key={refreshKey} onChange={bumpRefresh} onRestart={() => setView('timer')} />
