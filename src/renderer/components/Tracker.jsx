@@ -91,7 +91,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
           />
         )}
         {view === 'timetable' && (
-          <Timetable teamId={teamId} currentEntry={currentEntry} />
+          <Timetable teamId={teamId} currentEntry={currentEntry} onChange={bumpRefresh} />
         )}
         {view === 'history' && (
           <History teamId={teamId} key={refreshKey} onChange={bumpRefresh} onRestart={() => setView('timer')} />
