@@ -162,6 +162,13 @@
   padding: 4px 0;
 }
 
+.suggestions-loading {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 8px 10px;
+}
+
 .suggestions-browse {
   font-size: 11px;
   color: var(--text-muted);
