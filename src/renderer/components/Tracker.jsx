@@ -66,6 +66,7 @@ export default function Tracker({ teamId, onReset }) {
             selectedTask={selectedTask}
             currentEntry={currentEntry}
             onPickTask={() => setView('picker')}
+            onClearTask={() => { setSelectedTask(null); window.api.store.delete('last_task') }}
             onChange={bumpRefresh}
           />
         )}

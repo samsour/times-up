@@ -3,7 +3,7 @@ import { startTimer, stopTimer } from '../lib/clickup.js'
 import { formatDuration } from '../lib/time.js'
 import './TimerPanel.css'
 
-export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickTask, onChange }) {
+export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickTask, onClearTask, onChange }) {
   const [elapsed, setElapsed] = useState(0)
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
@@ -96,6 +96,10 @@ export default function TimerPanel({ teamId, selectedTask, currentEntry, onPickT
           <path d="M9 6l6 6-6 6" />
         </svg>
       </button>
+
+      {!isRunning && selectedTask && (
+        <button className="task-clear" onClick={onClearTask}>× clear task</button>
+      )}
 
       {/* Description (only when not running) */}
       {!isRunning && (
