@@ -100,8 +100,7 @@ function updateTrayTitle() {
     const sec = Math.floor((Date.now() - activeTimer.start) / 1000)
     const h = Math.floor(sec / 3600).toString().padStart(2, '0')
     const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0')
-    const s = (sec % 60).toString().padStart(2, '0')
-    tray.setTitle(activeTimer.label ? `${h}:${m}:${s}  ${activeTimer.label}` : `${h}:${m}:${s}`)
+    tray.setTitle(activeTimer.label ? `${h}:${m}  ${activeTimer.label}` : `${h}:${m}`)
   } else {
     tray.setTitle('not tracking rn')
   }
@@ -117,7 +116,7 @@ function createTray() {
   tray.on('click', toggleWindow)
 
   syncTimer()
-  setInterval(updateTrayTitle, 1000)
+  setInterval(updateTrayTitle, 10_000)
   setInterval(syncTimer, 10_000)
 
   // Right-click menu for quitting
