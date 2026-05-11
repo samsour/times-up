@@ -47,6 +47,24 @@
   gap: 2px;
 }
 
+.timer-task-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timer-task-link {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  transition: color 0.12s;
+  flex-shrink: 0;
+}
+
+.timer-task-link:hover {
+  color: var(--text);
+}
+
 .timer-task-list {
   font-size: 9px;
   letter-spacing: 0.12em;
@@ -127,13 +145,13 @@
 }
 
 .timer-action-start {
-  background: var(--accent);
-  color: #0a0a0a;
+  background: var(--cta-bg);
+  color: var(--cta-text);
 }
 
 .timer-action-start:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px -8px var(--accent);
+  box-shadow: 0 8px 24px -8px var(--cta-bg);
 }
 
 .timer-action-stop {

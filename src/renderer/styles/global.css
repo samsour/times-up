@@ -8,7 +8,10 @@
   --text-dim: #888888;
   --text-muted: #555555;
   --accent: #888888;
+  --accent-text: #0a0a0a;
   --accent-dim: rgba(136, 136, 136, 0.12);
+  --cta-bg: #f0f0f0;
+  --cta-text: #0a0a0a;
   --success: #4ade80;
   --danger: #f87171;
 
@@ -34,7 +37,10 @@
   --text-dim: #555555;
   --text-muted: #999999;
   --accent: #444444;
+  --accent-text: #ffffff;
   --accent-dim: rgba(68, 68, 68, 0.08);
+  --cta-bg: #111111;
+  --cta-text: #ffffff;
   --success: #16a34a;
   --danger: #dc2626;
 }

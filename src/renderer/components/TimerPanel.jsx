@@ -157,15 +157,28 @@ export default function TimerPanel({
         </div>
         <div className="timer-status">
           {isRunning ? (
-            <>
-              <span className="status-dot status-running" />
-              <div className="timer-task-info">
+            <div className="timer-task-info">
+              <span className="timer-task-name-row">
+                <span className="status-dot status-running" />
                 <span>{currentEntry.task?.name || "unassigned"}</span>
-                {taskDetail?.list?.name && (
-                  <span className="timer-task-list">{taskDetail.list.name}</span>
+                {currentEntry.task?.id && (
+                  <button
+                    className="timer-task-link"
+                    title="Open in ClickUp"
+                    onClick={() => window.api.shell.openExternal(
+                      taskDetail?.url || `https://app.clickup.com/t/${currentEntry.task.id}`
+                    )}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                    </svg>
+                  </button>
                 )}
-              </div>
-            </>
+              </span>
+              {taskDetail?.list?.name && (
+                <span className="timer-task-list">{taskDetail.list.name}</span>
+              )}
+            </div>
           ) : (
             <>
               <span className="status-dot" />

@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   window: {
     hide: () => ipcRenderer.invoke('window:hide')
+  },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
   }
 })

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Store from 'electron-store'
@@ -167,3 +167,4 @@ ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
 })
 
 ipcMain.handle('window:hide', () => win.hide())
+ipcMain.handle('shell:openExternal', (_, url) => shell.openExternal(url))
