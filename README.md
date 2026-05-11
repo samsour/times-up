@@ -11,7 +11,7 @@ A menu bar time tracker for ClickUp. Replaces Toggl. Mac + Windows.
 - Start/stop a live timer, with or without an assigned task
 - Assign a task to a running unassigned timer mid-session
 - Quick-start from your in-progress tasks (assigned to you, ordered by last updated)
-- Add manual time entries (date, time, duration)
+- Day view — visual timetable of today's entries; drag to create new entries, drag to move or resize existing ones
 - View today's / last 7 days' log, edit durations, delete entries, restart past entries
 - Notes field always visible — saves to ClickUp on blur while tracking
 - Idle detection — prompts after configurable inactivity, with option to trim idle time
@@ -48,7 +48,7 @@ npm run build:mac    # produces release/*.dmg  (run on a Mac)
 npm run build:win    # produces release/*.exe  (run on Windows)
 ```
 
-Unsigned builds will trigger a "developer not verified" warning on first launch. Right-click → Open on Mac, "More info → Run anyway" on Windows. For a clean install experience add code-signing certs to `package.json` under `build.mac.identity` / `build.win.certificateFile`.
+Unsigned builds will trigger a "damaged and can't be opened" error on Mac and an "unrecognized app" warning on Windows. To bypass: on Mac run `xattr -cr TimesUp.app` or go to System Settings → Privacy & Security → Open Anyway; on Windows click "More info → Run anyway". For a clean install experience add code-signing certs to `package.json` under `build.mac.identity` / `build.win.certificateFile`.
 
 > **Note:** In dev mode the "Launch at login" toggle registers the Electron binary and will show as "Electron" in macOS login items. This resolves correctly in a signed/packaged build.
 
@@ -79,7 +79,7 @@ src/
         ├── Tracker.jsx          # shell with tabs + idle prompt integration
         ├── TimerPanel.jsx       # start/stop, task suggestions, notes, last entry
         ├── TaskPicker.jsx       # search + Space → Folder → List → Task drill-down
-        ├── ManualEntry.jsx      # add past entries
+        ├── Timetable.jsx        # day view — visual timeline with drag-to-create and drag-to-edit
         ├── History.jsx          # today / 7-day log with restart buttons
         ├── Settings.jsx         # theme, font, idle detection, launch at login, sign out
         └── IdlePrompt.jsx       # overlay shown on idle while tracking
@@ -93,6 +93,7 @@ src/
 - [x] In-progress task suggestions (your tasks filtered to "in progress", newest first)
 - [x] Notes field while tracking (saves on blur)
 - [x] Open tracked task in ClickUp (external link icon)
+- [x] Day view — timetable of today's entries, drag to create, drag to move/resize
 - [x] History log sorted newest first, with restart buttons
 - [x] Idle detection with configurable threshold and trim-idle option
 - [x] Dark / light / auto theme
@@ -115,7 +116,7 @@ src/
 - [ ] **Time rounding** — round stopped entries to the nearest 5/10/15 minutes (configurable); useful for billing workflows
 - [ ] **Billable flag** — ClickUp's time entry API supports a `billable` boolean; expose a toggle in the timer and manual entry screens
 - [ ] **Tags** — ClickUp time entries support tags; add a tag selector to the timer and manual entry screens
-- [ ] **Daily goal** — set a target number of hours per day; show a progress bar in the menu bar title or tray tooltip
+- [ ] **Daily goal** — read the user's capacity from `GET /team/{id}` (member `capacity` field, in ms); use it as the daily target and show a progress bar in the tray title or window
 - [ ] **Weekly summary** — a read-only report view breaking down tracked time by Space or List over the last 7 days
 - [ ] **CSV export** — dump the current log view to a `.csv` file for use in invoicing tools
 
@@ -150,4 +151,4 @@ Good places to start:
 
 ## License
 
-This tool is open source — MIT licensed. Use it, fork it, ship it. ClickUp itself is a separate product and not affiliated with this project.
+This tool is open source — MIT licensed. Use it, fork it. ClickUp itself is a separate product and not affiliated with this project.
