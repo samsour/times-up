@@ -9,7 +9,8 @@
     "build": "vite build && electron-builder",
     "build:mac": "vite build && electron-builder --mac",
     "build:win": "vite build && electron-builder --win",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "release": "git tag v$(node -p \"require('./package.json').version\") && git push origin --tags && git push github main --tags"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
