@@ -1,6 +1,6 @@
 {
   "name": "times-up",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Menu bar time tracker for ClickUp",
   "license": "MIT",
   "repository": "https://github.com/samsour/times-up",
@@ -47,10 +47,14 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": ["dmg"]
+      "target": [
+        "dmg"
+      ]
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "publish": {
       "provider": "github",
