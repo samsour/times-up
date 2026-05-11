@@ -39,9 +39,9 @@ export default function Setup({ onComplete }) {
       <div className="setup-bg" />
       <div className="setup-inner">
         <h1 className="setup-title">
-          <span className="setup-title-italic">time</span>track
+          <span className="setup-title-italic">Times</span>Up
         </h1>
-        <p className="setup-subtitle">A quieter way to log hours.</p>
+        <p className="setup-subtitle">ClickUp time tracking made easy.<br />Just enter your API key and you're good to go.</p>
 
         {step === 'token' && (
           <div className="setup-step">

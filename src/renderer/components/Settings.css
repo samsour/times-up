@@ -110,6 +110,23 @@
   transform: translateX(16px);
 }
 
+.settings-text-input {
+  font-size: 11px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  width: 140px;
+  text-align: right;
+  user-select: text;
+}
+
+.settings-text-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .settings-number-row {
   display: flex;
   align-items: center;

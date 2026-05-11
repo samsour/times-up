@@ -6,7 +6,7 @@ import Store from 'electron-store'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const store = new Store()
 
-app.setName('ClickUp Tracker')
+app.setName('TimesUp')
 
 let tray = null
 let win = null
@@ -104,17 +104,20 @@ function updateTrayTitle() {
     const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0')
     tray.setTitle(activeTimer.label ? `${h}:${m}  ${activeTimer.label}` : `${h}:${m}`)
   } else {
-    tray.setTitle('not tracking rn')
+    tray.setTitle(store.get('idleText') || 'not tracking rn')
   }
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, '../../src/assets/icon.png'))
+  const assetsPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'assets')
+    : path.join(__dirname, '../../src/assets')
+  const icon = nativeImage.createFromPath(path.join(assetsPath, 'icon.png'))
     .resize({ width: 18, height: 18 })
   icon.setTemplateImage(true)
 
   tray = new Tray(icon)
-  tray.setToolTip('ClickUp Tracker')
+  tray.setToolTip('TimesUp')
   tray.on('click', toggleWindow)
 
   syncTimer()

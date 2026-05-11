@@ -1,8 +1,9 @@
 {
-  "name": "clickup-tracker",
+  "name": "times-up",
   "version": "1.0.0",
   "description": "Menu bar time tracker for ClickUp",
   "license": "MIT",
+  "repository": "https://github.com/samsour/times-up",
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
@@ -29,13 +30,20 @@
   },
   "build": {
     "appId": "com.yourname.clickuptracker",
-    "productName": "ClickUp Tracker",
+    "productName": "TimesUp",
+    "icon": "src/assets/app-icon-2x.png",
     "directories": {
       "output": "release"
     },
     "files": [
       "dist/**/*",
       "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "src/assets",
+        "to": "assets"
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",

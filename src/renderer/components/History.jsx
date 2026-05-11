@@ -131,7 +131,8 @@ export default function History({ teamId, onChange, onRestart }) {
                       <div className="entry-desc">{entry.description}</div>
                     )}
                     <div className="entry-meta">
-                      {formatTime(entry.start)} · {entry.task?.status?.status || ''}
+                      {formatTime(entry.start)} – {formatTime(parseInt(entry.start) + parseInt(entry.duration))}
+                      {entry.task?.status?.status ? ` · ${entry.task.status.status}` : ''}
                     </div>
                   </div>
                   <div className="entry-side">

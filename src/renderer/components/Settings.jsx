@@ -5,12 +5,19 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
   const [autoLaunch, setAutoLaunch] = useState(false)
   const [idleDetection, setIdleDetection] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(5)
+  const [idleText, setIdleText] = useState('not tracking rn')
 
   useEffect(() => {
     window.api.app.getLoginItemSettings().then(setAutoLaunch)
     window.api.store.get('idleDetection').then(v => setIdleDetection(!!v))
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
+    window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
   }, [])
+
+  async function handleIdleText(val) {
+    setIdleText(val)
+    await window.api.store.set('idleText', val)
+  }
 
   async function handleIdleDetection(val) {
     setIdleDetection(val)
@@ -113,6 +120,20 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
             </div>
           </div>
         )}
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-label">Menu bar</div>
+        <div className="settings-row">
+          <span className="settings-row-title">Idle text</span>
+          <input
+            className="settings-text-input"
+            value={idleText}
+            maxLength={40}
+            onChange={e => handleIdleText(e.target.value)}
+            placeholder="not tracking rn"
+          />
+        </div>
       </div>
 
       <div className="settings-section">

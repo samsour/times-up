@@ -1,4 +1,4 @@
-# ClickUp Tracker
+# TimesUp
 
 A menu bar time tracker for ClickUp. Replaces Toggl. Mac + Windows.
 
