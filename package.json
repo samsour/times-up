@@ -2,6 +2,7 @@
   "name": "clickup-tracker",
   "version": "1.0.0",
   "description": "Menu bar time tracker for ClickUp",
+  "license": "MIT",
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
