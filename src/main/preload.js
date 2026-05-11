@@ -18,5 +18,13 @@ contextBridge.exposeInMainWorld('api', {
   app: {
     getLoginItemSettings: () => ipcRenderer.invoke('app:getLoginItemSettings'),
     setLoginItemSettings: (openAtLogin) => ipcRenderer.invoke('app:setLoginItemSettings', openAtLogin)
+  },
+  idle: {
+    onDetected: (cb) => {
+      const handler = (_, seconds) => cb(seconds)
+      ipcRenderer.on('idle:detected', handler)
+      return () => ipcRenderer.removeListener('idle:detected', handler)
+    },
+    dismiss: () => ipcRenderer.invoke('idle:dismiss')
   }
 })

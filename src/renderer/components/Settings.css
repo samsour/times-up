@@ -85,14 +85,14 @@
   width: 36px;
   height: 20px;
   border-radius: 10px;
-  background: var(--border-strong);
+  background: var(--text-muted);
   position: relative;
   transition: background 0.2s;
   flex-shrink: 0;
 }
 
 .settings-toggle-on {
-  background: var(--accent);
+  background: var(--cta-bg);
 }
 
 .settings-toggle-knob {
@@ -102,13 +102,40 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--text-muted);
-  transition: transform 0.2s, background 0.2s;
+  background: var(--bg);
+  transition: transform 0.2s;
 }
 
 .settings-toggle-on .settings-toggle-knob {
   transform: translateX(16px);
-  background: var(--text);
+}
+
+.settings-number-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-number {
+  width: 48px;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text);
+  text-align: center;
+  user-select: text;
+}
+
+.settings-number:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.settings-number-unit {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .settings-signout {

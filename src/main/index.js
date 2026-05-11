@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, shell } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, shell, powerMonitor } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Store from 'electron-store'
@@ -172,3 +172,17 @@ ipcMain.handle('window:hide', () => win.hide())
 ipcMain.handle('shell:openExternal', (_, url) => shell.openExternal(url))
 ipcMain.handle('app:getLoginItemSettings', () => app.getLoginItemSettings().openAtLogin)
 ipcMain.handle('app:setLoginItemSettings', (_, openAtLogin) => app.setLoginItemSettings({ openAtLogin }))
+ipcMain.handle('idle:dismiss', () => { idlePromptShown = false })
+
+let idlePromptShown = false
+setInterval(() => {
+  if (!win || idlePromptShown) return
+  const enabled = store.get('idleDetection')
+  if (!enabled) return
+  const thresholdMins = store.get('idleThreshold') || 5
+  const idleSeconds = powerMonitor.getSystemIdleTime()
+  if (idleSeconds >= thresholdMins * 60) {
+    idlePromptShown = true
+    win.webContents.send('idle:detected', idleSeconds)
+  }
+}, 15000)

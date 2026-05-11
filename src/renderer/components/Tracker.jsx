@@ -4,6 +4,7 @@ import TaskPicker from './TaskPicker.jsx'
 import History from './History.jsx'
 import ManualEntry from './ManualEntry.jsx'
 import Settings from './Settings.jsx'
+import IdlePrompt from './IdlePrompt.jsx'
 import { getCurrentTimer, startTimer, updateTimeEntry } from '../lib/clickup.js'
 import './Tracker.css'
 
@@ -11,6 +12,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   const [view, setView] = useState('timer') // 'timer' | 'tasks' | 'manual' | 'history' | 'settings'
   const [currentEntry, setCurrentEntry] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [idleSeconds, setIdleSeconds] = useState(null)
 
   const refreshCurrent = useCallback(async () => {
     try {
@@ -26,6 +28,12 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
     const interval = setInterval(refreshCurrent, 10000)
     return () => clearInterval(interval)
   }, [refreshCurrent])
+
+  useEffect(() => {
+    return window.api.idle.onDetected((seconds) => {
+      setIdleSeconds(seconds)
+    })
+  }, [])
 
   function bumpRefresh() {
     setRefreshKey(k => k + 1)
@@ -65,7 +73,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
         </button>
       </header>
 
-      <main className="tracker-body">
+      <main className="tracker-body" style={{ position: 'relative' }}>
         {view === 'timer' && (
           <TimerPanel
             teamId={teamId}
@@ -100,6 +108,20 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
             font={font}
             onFontChange={onFontChange}
             onSignOut={onReset}
+          />
+        )}
+        {idleSeconds && currentEntry && (
+          <IdlePrompt
+            idleSeconds={idleSeconds}
+            currentEntry={currentEntry}
+            teamId={teamId}
+            onDismiss={(action) => {
+              setIdleSeconds(null)
+              if (action === 'removed' || action === 'stopped') {
+                bumpRefresh()
+                setView('timer')
+              }
+            }}
           />
         )}
       </main>

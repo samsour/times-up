@@ -3,10 +3,25 @@ import './Settings.css'
 
 export default function Settings({ theme, onThemeChange, font, onFontChange, onSignOut }) {
   const [autoLaunch, setAutoLaunch] = useState(false)
+  const [idleDetection, setIdleDetection] = useState(false)
+  const [idleThreshold, setIdleThreshold] = useState(5)
 
   useEffect(() => {
     window.api.app.getLoginItemSettings().then(setAutoLaunch)
+    window.api.store.get('idleDetection').then(v => setIdleDetection(!!v))
+    window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
   }, [])
+
+  async function handleIdleDetection(val) {
+    setIdleDetection(val)
+    await window.api.store.set('idleDetection', val)
+  }
+
+  async function handleIdleThreshold(val) {
+    const clamped = Math.max(1, Math.min(120, parseInt(val) || 1))
+    setIdleThreshold(clamped)
+    await window.api.store.set('idleThreshold', clamped)
+  }
 
   async function handleAutoLaunch(val) {
     await window.api.app.setLoginItemSettings(val)
@@ -73,6 +88,31 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
             <span className="settings-toggle-knob" />
           </button>
         </div>
+        <div className="settings-row">
+          <span className="settings-row-title">Idle detection</span>
+          <button
+            className={`settings-toggle ${idleDetection ? 'settings-toggle-on' : ''}`}
+            onClick={() => handleIdleDetection(!idleDetection)}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
+        </div>
+        {idleDetection && (
+          <div className="settings-row">
+            <span className="settings-row-title">Prompt after</span>
+            <div className="settings-number-row">
+              <input
+                className="settings-number"
+                type="number"
+                min="1"
+                max="120"
+                value={idleThreshold}
+                onChange={e => handleIdleThreshold(e.target.value)}
+              />
+              <span className="settings-number-unit">min</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="settings-section">
