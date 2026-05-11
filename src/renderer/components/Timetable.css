@@ -21,6 +21,10 @@
   cursor: ns-resize;
 }
 
+.timetable-inner-block-dragging {
+  cursor: grabbing;
+}
+
 .timetable-hour {
   position: absolute;
   left: 0;
@@ -72,7 +76,7 @@
 
 .timetable-block {
   position: absolute;
-  cursor: default;
+  cursor: grab;
   background: var(--accent-dim);
   border-left: 2px solid var(--accent);
   border-radius: 0 4px 4px 0;
@@ -104,6 +108,35 @@
 
 .timetable-block-live .timetable-block-name {
   animation: pulse 2.5s ease-in-out infinite;
+}
+
+.timetable-block-dragging {
+  cursor: grabbing;
+  z-index: 5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: none;
+}
+
+.timetable-block-resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.timetable-block:hover .timetable-block-resize-handle::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.5;
 }
 
 .timetable-block-name {

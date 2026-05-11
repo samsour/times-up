@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getTimeEntries, createTimeEntry } from '../lib/clickup.js'
+import { getTimeEntries, createTimeEntry, updateTimeEntry } from '../lib/clickup.js'
 import { formatDurationShort, formatTime, startOfDay, endOfDay } from '../lib/time.js'
 import './Timetable.css'
 
@@ -19,6 +19,8 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
   const [draft, setDraft] = useState(null)
   const [draftDesc, setDraftDesc] = useState('')
   const [saving, setSaving] = useState(false)
+  const [draggingBlock, setDraggingBlock] = useState(null)
+  const draggingRef = useRef(null)
   const scrollRef = useRef(null)
   const innerRef = useRef(null)
   const rangeStartRef = useRef(0)
@@ -37,13 +39,13 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
     el.scrollTop = nowY - el.clientHeight / 2
   }, [loading])
 
-  async function load() {
-    setLoading(true)
+  async function load(silent = false) {
+    if (!silent) setLoading(true)
     try {
       const data = await getTimeEntries(teamId, startOfDay(), endOfDay())
       setEntries(data || [])
     } catch {}
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   function getTimeFromEvent(e) {
@@ -53,6 +55,7 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
     return snap(rangeStartRef.current + (y / PX_PER_HOUR) * 3600000)
   }
 
+  // ── drag-to-create ────────────────────────────────────────────────────────
   function handleInnerMouseDown(e) {
     if (e.button !== 0) return
     if (e.target.closest('.timetable-block') || e.target.closest('.timetable-draft-form')) return
@@ -66,7 +69,6 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
       const current = getTimeFromEvent(ev)
       if (current !== null) setDragRange({ anchor, current })
     }
-
     function onUp(ev) {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
@@ -74,16 +76,71 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
       const start = Math.min(anchor, current)
       const end = Math.max(anchor, current)
       setDragRange(null)
-      if (end - start >= SNAP_MS) {
-        setDraft({ start, end })
-        setDraftDesc('')
+      if (end - start >= SNAP_MS) { setDraft({ start, end }); setDraftDesc('') }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  // ── drag existing block (move or resize) ─────────────────────────────────
+  function handleBlockMouseDown(e, entry, type) {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    e.preventDefault()
+
+    const origStart = parseInt(entry.start)
+    const origDuration = parseInt(entry.duration || 0)
+    const anchorMs = getTimeFromEvent(e)
+
+    const initial = {
+      id: entry.id,
+      type,
+      origStart,
+      origDuration,
+      currentStart: origStart,
+      currentEnd: origStart + origDuration,
+    }
+    draggingRef.current = initial
+    setDraggingBlock(initial)
+
+    function onMove(ev) {
+      const t = getTimeFromEvent(ev)
+      if (t === null) return
+      let next
+      if (type === 'move') {
+        const newStart = snap(origStart + (t - anchorMs))
+        next = { ...draggingRef.current, currentStart: newStart, currentEnd: newStart + origDuration }
+      } else {
+        const newEnd = Math.max(snap(t), origStart + SNAP_MS)
+        next = { ...draggingRef.current, currentEnd: newEnd }
       }
+      draggingRef.current = next
+      setDraggingBlock(next)
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      const d = draggingRef.current
+      draggingRef.current = null
+      setDraggingBlock(null)
+      if (!d) return
+
+      const body = d.type === 'move'
+        ? { start: d.currentStart, duration: d.origDuration }
+        : { start: d.origStart, duration: d.currentEnd - d.origStart }
+
+      updateTimeEntry(teamId, d.id, body)
+        .then(() => load(true))
+        .then(() => onChange?.())
+        .catch(err => alert(err.message))
     }
 
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
   }
 
+  // ── draft save/cancel ─────────────────────────────────────────────────────
   async function saveDraft() {
     setSaving(true)
     try {
@@ -94,7 +151,7 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
       })
       setDraft(null)
       setDraftDesc('')
-      await load()
+      await load(true)
       onChange?.()
     } catch (err) {
       alert(err.message)
@@ -103,11 +160,9 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
     }
   }
 
-  function cancelDraft() {
-    setDraft(null)
-    setDraftDesc('')
-  }
+  function cancelDraft() { setDraft(null); setDraftDesc('') }
 
+  // ── render ────────────────────────────────────────────────────────────────
   const allBlocks = [...entries]
   if (currentEntry?.id) {
     const idx = allBlocks.findIndex(e => e.id === currentEntry.id)
@@ -142,11 +197,17 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
     ? { start: Math.min(dragRange.anchor, dragRange.current), end: Math.max(dragRange.anchor, dragRange.current) }
     : null
 
+  const innerClass = [
+    'timetable-inner',
+    dragRange ? 'timetable-inner-dragging' : '',
+    draggingBlock ? 'timetable-inner-block-dragging' : '',
+  ].filter(Boolean).join(' ')
+
   return (
     <div className="timetable">
       <div className="timetable-scroll" ref={scrollRef}>
         <div
-          className={`timetable-inner${dragRange ? ' timetable-inner-dragging' : ''}`}
+          className={innerClass}
           ref={innerRef}
           style={{ height: hours.length * PX_PER_HOUR }}
           onMouseDown={handleInnerMouseDown}
@@ -163,22 +224,51 @@ export default function Timetable({ teamId, currentEntry, onChange }) {
           )}
 
           {allBlocks.map(entry => {
-            const start = parseInt(entry.start)
             const isRunning = currentEntry?.id === entry.id
-            const duration = isRunning ? now - start : parseInt(entry.duration || 0)
-            const top = msToY(start)
-            const height = Math.max(msToY(start + duration) - top, 18)
+            const isDragging = draggingBlock?.id === entry.id
+
+            let blockStart, blockEnd
+            if (isDragging) {
+              blockStart = draggingBlock.type === 'move' ? draggingBlock.currentStart : draggingBlock.origStart
+              blockEnd = draggingBlock.currentEnd
+            } else {
+              blockStart = parseInt(entry.start)
+              blockEnd = isRunning
+                ? now
+                : blockStart + parseInt(entry.duration || 0)
+            }
+
+            const duration = blockEnd - blockStart
+            const top = msToY(blockStart)
+            const height = Math.max(msToY(blockEnd) - top, 18)
             const label = entry.task?.name || entry.description || 'Untitled'
 
             return (
               <div
                 key={entry.id}
-                className={`timetable-block${isRunning ? ' timetable-block-live' : ''}`}
+                className={[
+                  'timetable-block',
+                  isRunning ? 'timetable-block-live' : '',
+                  isDragging ? 'timetable-block-dragging' : '',
+                ].filter(Boolean).join(' ')}
                 style={{ top, height, left: LABEL_W + 6, right: 8 }}
-                title={`${label} · ${formatDurationShort(duration)}`}
+                title={!isDragging ? `${label} · ${formatDurationShort(duration)}` : undefined}
+                onMouseDown={!isRunning ? e => handleBlockMouseDown(e, entry, 'move') : undefined}
               >
                 {height >= 18 && <span className="timetable-block-name">{label}</span>}
-                {height >= 34 && <span className="timetable-block-dur">{formatDurationShort(duration)}</span>}
+                {height >= 34 && (
+                  <span className="timetable-block-dur">
+                    {isDragging
+                      ? `${formatTime(blockStart)} – ${formatTime(blockEnd)}`
+                      : formatDurationShort(duration)}
+                  </span>
+                )}
+                {!isRunning && (
+                  <div
+                    className="timetable-block-resize-handle"
+                    onMouseDown={e => { e.stopPropagation(); handleBlockMouseDown(e, entry, 'resize') }}
+                  />
+                )}
               </div>
             )
           })}
