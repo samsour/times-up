@@ -20,6 +20,25 @@
   --radius-sm: 6px;
 }
 
+[data-font="dotted"] {
+  --font-display: 'Silkscreen', monospace;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-elevated: #f2f2f2;
+  --bg-hover: #e8e8e8;
+  --border: #e0e0e0;
+  --border-strong: #c8c8c8;
+  --text: #111111;
+  --text-dim: #555555;
+  --text-muted: #999999;
+  --accent: #444444;
+  --accent-dim: rgba(68, 68, 68, 0.08);
+  --success: #16a34a;
+  --danger: #dc2626;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

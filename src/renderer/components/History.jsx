@@ -74,9 +74,9 @@ export default function History({ teamId, onChange, onRestart }) {
     }
   }
 
-  // Group by day
+  // Group by day, newest first within each day
   const grouped = {}
-  for (const e of entries) {
+  for (const e of [...entries].sort((a, b) => parseInt(b.start) - parseInt(a.start))) {
     const dayKey = startOfDay(new Date(parseInt(e.start)))
     if (!grouped[dayKey]) grouped[dayKey] = []
     grouped[dayKey].push(e)
