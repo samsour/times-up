@@ -7,6 +7,7 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
   const [dailyGoalHours, setDailyGoalHours] = useState('')
+  const [updateState, setUpdateState] = useState('idle')
 
   useEffect(() => {
     window.api.app.getLoginItemSettings().then(setAutoLaunch)
@@ -14,6 +15,8 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
     window.api.store.get('daily_goal_hours').then(v => setDailyGoalHours(v || ''))
+    window.api.updater.getState().then(setUpdateState)
+    return window.api.updater.onStateChange(setUpdateState)
   }, [])
 
   async function handleIdleText(val) {
@@ -163,6 +166,28 @@ export default function Settings({ theme, onThemeChange, font, onFontChange, onS
             onChange={e => handleIdleText(e.target.value)}
             placeholder="not tracking rn"
           />
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-label">Updates</div>
+        <div className="settings-row">
+          <span className="settings-row-title">
+            {updateState === 'idle' && 'Up to date'}
+            {updateState === 'checking' && 'Checking…'}
+            {updateState === 'downloading' && 'Downloading…'}
+            {updateState === 'ready' && 'Ready to install'}
+          </span>
+          {updateState === 'idle' && (
+            <button className="settings-update-btn" onClick={() => window.api.updater.check()}>
+              Check
+            </button>
+          )}
+          {updateState === 'ready' && (
+            <button className="settings-update-btn settings-update-btn-ready" onClick={() => window.api.updater.install()}>
+              Restart
+            </button>
+          )}
         </div>
       </div>
 

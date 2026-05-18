@@ -26,5 +26,15 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener('idle:detected', handler)
     },
     dismiss: () => ipcRenderer.invoke('idle:dismiss')
+  },
+  updater: {
+    getState: () => ipcRenderer.invoke('update:getState'),
+    check: () => ipcRenderer.invoke('update:check'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onStateChange: (cb) => {
+      const handler = (_, state) => cb(state)
+      ipcRenderer.on('update:stateChange', handler)
+      return () => ipcRenderer.removeListener('update:stateChange', handler)
+    }
   }
 })

@@ -13,6 +13,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   const [currentEntry, setCurrentEntry] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [idleSeconds, setIdleSeconds] = useState(null)
+  const [updateReady, setUpdateReady] = useState(false)
 
   const refreshCurrent = useCallback(async () => {
     try {
@@ -32,6 +33,12 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   useEffect(() => {
     return window.api.idle.onDetected((seconds) => {
       setIdleSeconds(seconds)
+    })
+  }, [])
+
+  useEffect(() => {
+    return window.api.updater.onStateChange((state) => {
+      if (state === 'ready') setUpdateReady(true)
     })
   }, [])
 
@@ -104,6 +111,12 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
             onFontChange={onFontChange}
             onSignOut={onReset}
           />
+        )}
+        {updateReady && (
+          <div className="update-banner">
+            <span>Update ready</span>
+            <button onClick={() => window.api.updater.install()}>Restart</button>
+          </div>
         )}
         {idleSeconds && currentEntry && (
           <IdlePrompt
