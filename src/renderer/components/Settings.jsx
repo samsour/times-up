@@ -239,7 +239,10 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       </div>
 
       <div className="settings-section">
-        <div className="settings-label">Export</div>
+        <div className="settings-label">
+          Export
+          <span className="settings-label-badge">Toggl</span>
+        </div>
         <div className="export-card">
           <div className="export-controls">
             <div className="export-presets">
