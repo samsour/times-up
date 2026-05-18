@@ -98,6 +98,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
         )}
         {view === 'settings' && (
           <Settings
+            teamId={teamId}
             theme={theme}
             onThemeChange={onThemeChange}
             font={font}
