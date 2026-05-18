@@ -28,6 +28,8 @@ export default function TimerPanel({
   const [taskDetail, setTaskDetail] = useState(null);
   const [capacity, setCapacity] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
+  const [editingStart, setEditingStart] = useState(false);
+  const [startEdit, setStartEdit] = useState("");
 
   const isRunning = !!currentEntry;
 
@@ -96,6 +98,31 @@ export default function TimerPanel({
         .catch(() => {});
     }
   }, [teamId, userId, isRunning, isRunningUnassigned]);
+
+  function openStartEdit() {
+    const d = new Date(parseInt(currentEntry.start));
+    const pad = (n) => String(n).padStart(2, "0");
+    setStartEdit(
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    );
+    setEditingStart(true);
+  }
+
+  async function saveStartEdit() {
+    const newMs = new Date(startEdit).getTime();
+    if (!newMs || newMs >= Date.now()) { setEditingStart(false); return; }
+    setBusy(true);
+    setError("");
+    try {
+      await updateTimeEntry(teamId, currentEntry.id, { start: newMs });
+      setEditingStart(false);
+      onChange();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleStop() {
     setBusy(true);
@@ -206,6 +233,46 @@ export default function TimerPanel({
           )}
         </div>
       </div>
+
+      {/* Start time editor */}
+      {isRunning && (
+        <div className="timer-start-edit">
+          {editingStart ? (
+            <div className="timer-start-input-row">
+              <input
+                type="datetime-local"
+                className="timer-start-input"
+                value={startEdit}
+                onChange={(e) => setStartEdit(e.target.value)}
+                max={new Date().toISOString().slice(0, 16)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveStartEdit();
+                  if (e.key === "Escape") setEditingStart(false);
+                }}
+                autoFocus
+              />
+              <button className="timer-start-confirm" onClick={saveStartEdit} disabled={busy}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </button>
+              <button className="timer-start-cancel" onClick={() => setEditingStart(false)}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <button className="timer-start-show" onClick={openStartEdit}>
+              since {new Date(parseInt(currentEntry.start)).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Daily progress */}
       {capacity > 0 && (() => {
