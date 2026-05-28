@@ -30,7 +30,7 @@
     "react-dom": "^18.2.0"
   },
   "build": {
-    "appId": "com.yourname.clickuptracker",
+    "appId": "com.krekeny.timesup",
     "productName": "TimesUp",
     "icon": "src/assets/app-icon-2x.png",
     "directories": {
