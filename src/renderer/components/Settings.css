@@ -171,6 +171,31 @@
   color: var(--text-muted);
 }
 
+.settings-update-btn {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  transition: all 0.12s;
+}
+
+.settings-update-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.settings-update-btn-ready {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.settings-update-btn-ready:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 .export-card {
   display: flex;
   flex-direction: column;

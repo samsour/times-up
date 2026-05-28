@@ -45,6 +45,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
   const [dailyGoalHours, setDailyGoalHours] = useState('')
+  const [updateState, setUpdateState] = useState('idle')
   const [exportPreset, setExportPreset] = useState('week') // 'week' | 'month' | 'custom'
   const [exportFrom, setExportFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-01` })
   const [exportTo, setExportTo] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` })
@@ -56,6 +57,8 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
     window.api.store.get('daily_goal_hours').then(v => setDailyGoalHours(v || ''))
+    window.api.updater.getState().then(setUpdateState)
+    return window.api.updater.onStateChange(setUpdateState)
   }, [])
 
   async function handleIdleText(val) {
@@ -239,61 +242,23 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       </div>
 
       <div className="settings-section">
-        <div className="settings-label">
-          Export
-          <span className="settings-label-badge">Toggl</span>
-        </div>
-        <div className="export-card">
-          <div className="export-controls">
-            <div className="export-presets">
-              {[
-                { key: 'week', label: 'Last week' },
-                { key: 'month', label: 'Last month' },
-                { key: 'custom', label: 'Custom' },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  className={`export-preset-btn ${exportPreset === key ? 'export-preset-btn-active' : ''}`}
-                  onClick={() => setExportPreset(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <button className="export-btn" disabled={exporting} onClick={handleExport}>
-              {exporting ? '…' : (
-                <>
-                  Export
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                  </svg>
-                </>
-              )}
+        <div className="settings-label">Updates</div>
+        <div className="settings-row">
+          <span className="settings-row-title">
+            {updateState === 'idle' && 'Up to date'}
+            {updateState === 'checking' && 'Checking…'}
+            {updateState === 'downloading' && 'Downloading…'}
+            {updateState === 'ready' && 'Ready to install'}
+          </span>
+          {updateState === 'idle' && (
+            <button className="settings-update-btn" onClick={() => window.api.updater.check()}>
+              Check
             </button>
-          </div>
-          {exportPreset === 'custom' && (
-            <div className="export-custom">
-              <div className="export-date-field">
-                <span className="export-date-label">From</span>
-                <input
-                  type="date"
-                  className="export-date-input"
-                  value={exportFrom}
-                  max={exportTo}
-                  onChange={e => setExportFrom(e.target.value)}
-                />
-              </div>
-              <div className="export-date-field">
-                <span className="export-date-label">To</span>
-                <input
-                  type="date"
-                  className="export-date-input"
-                  value={exportTo}
-                  min={exportFrom}
-                  onChange={e => setExportTo(e.target.value)}
-                />
-              </div>
-            </div>
+          )}
+          {updateState === 'ready' && (
+            <button className="settings-update-btn settings-update-btn-ready" onClick={() => window.api.updater.install()}>
+              Restart
+            </button>
           )}
         </div>
       </div>

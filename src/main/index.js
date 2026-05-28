@@ -2,6 +2,7 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, shell, po
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Store from 'electron-store'
+import { autoUpdater } from 'electron-updater'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const store = new Store()
@@ -12,6 +13,23 @@ let tray = null
 let win = null
 
 const isDev = !app.isPackaged
+
+// 'idle' | 'checking' | 'downloading' | 'ready'
+let updateState = 'idle'
+
+autoUpdater.autoDownload = true
+autoUpdater.autoInstallOnAppQuit = true
+
+function setUpdateState(state) {
+  updateState = state
+  if (win) win.webContents.send('update:stateChange', state)
+}
+
+autoUpdater.on('checking-for-update', () => setUpdateState('checking'))
+autoUpdater.on('update-not-available', () => setUpdateState('idle'))
+autoUpdater.on('error', () => setUpdateState('idle'))
+autoUpdater.on('download-progress', () => setUpdateState('downloading'))
+autoUpdater.on('update-downloaded', () => setUpdateState('ready'))
 
 function createWindow() {
   win = new BrowserWindow({
@@ -142,6 +160,7 @@ app.whenReady().then(() => {
   }
   createWindow()
   createTray()
+  if (!isDev) autoUpdater.checkForUpdatesAndNotify()
 })
 
 app.on('window-all-closed', (e) => {
@@ -173,6 +192,9 @@ ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
 })
 
 ipcMain.handle('window:hide', () => win.hide())
+ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
+ipcMain.handle('update:check', () => { if (updateState === 'idle') autoUpdater.checkForUpdates() })
+ipcMain.handle('update:getState', () => updateState)
 ipcMain.handle('shell:openExternal', (_, url) => shell.openExternal(url))
 ipcMain.handle('app:getLoginItemSettings', () => app.getLoginItemSettings().openAtLogin)
 ipcMain.handle('app:setLoginItemSettings', (_, openAtLogin) => app.setLoginItemSettings({ openAtLogin }))
