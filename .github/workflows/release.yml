@@ -14,21 +14,25 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            build_cmd: npm run build:mac
+            build_cmd: pnpm run build:mac
           - os: windows-latest
-            build_cmd: npm run build:win
+            build_cmd: pnpm run build:win
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - name: Build & publish
         run: ${{ matrix.build_cmd }}
