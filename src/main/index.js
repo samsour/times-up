@@ -11,6 +11,7 @@ app.setName('TimesUp')
 
 let tray = null
 let win = null
+let standaloneWin = null
 
 const isDev = !app.isPackaged
 
@@ -20,9 +21,15 @@ let updateState = 'idle'
 autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
 
+function broadcast(channel, payload) {
+  for (const w of [win, standaloneWin]) {
+    if (w && !w.isDestroyed()) w.webContents.send(channel, payload)
+  }
+}
+
 function setUpdateState(state) {
   updateState = state
-  if (win) win.webContents.send('update:stateChange', state)
+  broadcast('update:stateChange', state)
 }
 
 autoUpdater.on('checking-for-update', () => setUpdateState('checking'))
@@ -59,6 +66,50 @@ function createWindow() {
     if (!win.webContents.isDevToolsOpened()) {
       win.hide()
     }
+  })
+}
+
+function openStandaloneWindow() {
+  if (standaloneWin) {
+    standaloneWin.show()
+    standaloneWin.focus()
+    return
+  }
+
+  const savedBounds = store.get('standalone_bounds')
+  standaloneWin = new BrowserWindow({
+    width: savedBounds?.width || 420,
+    height: savedBounds?.height || 640,
+    x: savedBounds?.x,
+    y: savedBounds?.y,
+    minWidth: 340,
+    minHeight: 480,
+    show: false,
+    title: 'TimesUp',
+    backgroundColor: '#000000',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  })
+
+  if (isDev) {
+    standaloneWin.loadURL('http://localhost:5173')
+  } else {
+    standaloneWin.loadFile(path.join(__dirname, '../../dist/index.html'))
+  }
+
+  standaloneWin.once('ready-to-show', () => standaloneWin.show())
+
+  if (process.platform === 'darwin') app.dock?.show()
+
+  standaloneWin.on('close', () => {
+    store.set('standalone_bounds', standaloneWin.getBounds())
+  })
+  standaloneWin.on('closed', () => {
+    standaloneWin = null
+    if (process.platform === 'darwin') app.dock?.hide()
   })
 }
 
@@ -147,6 +198,7 @@ function createTray() {
   tray.on('right-click', () => {
     const menu = Menu.buildFromTemplate([
       { label: 'Open', click: toggleWindow },
+      { label: 'Open in Window', click: openStandaloneWindow },
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() }
     ])
@@ -209,6 +261,6 @@ setInterval(() => {
   const idleSeconds = powerMonitor.getSystemIdleTime()
   if (idleSeconds >= thresholdMins * 60) {
     idlePromptShown = true
-    win.webContents.send('idle:detected', idleSeconds)
+    broadcast('idle:detected', idleSeconds)
   }
 }, 15000)
