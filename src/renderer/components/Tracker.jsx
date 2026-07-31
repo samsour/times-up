@@ -106,7 +106,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
           <History teamId={teamId} key={refreshKey} onChange={bumpRefresh} onRestart={() => setView('timer')} />
         )}
         {view === 'reports' && (
-          <Reports teamId={teamId} key={refreshKey} />
+          <Reports teamId={teamId} userId={userId} key={refreshKey} />
         )}
         {view === 'settings' && (
           <Settings

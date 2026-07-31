@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
-import { getTimeEntries } from '../lib/clickup.js'
+import { getTimeEntries, getTeamMembers } from '../lib/clickup.js'
 import { formatDurationShort, startOfDay, endOfDay, startOfWeek, startOfMonth } from '../lib/time.js'
 import './Reports.css'
 
 const MAX_TASK_ROWS = 7
 
-export default function Reports({ teamId }) {
+export default function Reports({ teamId, userId }) {
   const [range, setRange] = useState('week') // 'week' | 'month' | '30d'
+  const [who, setWho] = useState('me') // 'me' | 'all' | member user id
+  const [members, setMembers] = useState([])
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -15,19 +17,24 @@ export default function Reports({ teamId }) {
   useEffect(() => {
     window.api.store.get('stats_range').then(r => { if (r) setRange(r) })
     window.api.store.get('daily_goal_hours').then(h => setGoalMs((h || 0) * 3600000))
-  }, [])
+    getTeamMembers(teamId).then(setMembers).catch(() => {})
+  }, [teamId])
 
   useEffect(() => {
+    if (who === 'all' && !members.length) return // wait for member list
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range, teamId])
+  }, [range, teamId, who, members])
 
   async function load() {
     setLoading(true)
     setError('')
     try {
       const days = rangeDays(range)
-      const data = await getTimeEntries(teamId, days[0], endOfDay(new Date(days[days.length - 1])))
+      let assignees = null
+      if (who === 'all') assignees = members.map(m => m.id)
+      else if (who !== 'me') assignees = [who]
+      const data = await getTimeEntries(teamId, days[0], endOfDay(new Date(days[days.length - 1])), assignees)
       setEntries((data || []).filter(e => parseInt(e.duration) > 0))
     } catch (e) {
       setError(e.message)
@@ -47,6 +54,7 @@ export default function Reports({ teamId }) {
   const perDay = {}
   const perTask = {}
   const perList = {}
+  const perUser = {}
   let total = 0
   for (const e of entries) {
     const ms = parseInt(e.duration)
@@ -58,6 +66,9 @@ export default function Reports({ teamId }) {
     const listId = e.task_location?.list_id || 'none'
     if (!perList[listId]) perList[listId] = { id: listId, name: e.task_location?.list_name || 'No list', ms: 0 }
     perList[listId].ms += ms
+    const uid = e.user?.id || 'unknown'
+    if (!perUser[uid]) perUser[uid] = { id: uid, name: e.user?.username || 'Unknown', ms: 0 }
+    perUser[uid].ms += ms
     total += ms
   }
 
@@ -74,6 +85,8 @@ export default function Reports({ teamId }) {
     })
   }
   const listRows = Object.values(perList).sort((a, b) => b.ms - a.ms)
+  const userRows = Object.values(perUser).sort((a, b) => b.ms - a.ms)
+  const others = members.filter(m => String(m.id) !== String(userId))
 
   return (
     <div className="stats">
@@ -83,7 +96,17 @@ export default function Reports({ teamId }) {
           <button className={`mini-tab ${range === 'month' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('month')}>Month</button>
           <button className={`mini-tab ${range === '30d' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('30d')}>30 Days</button>
         </div>
-        <span className="stats-range-label">{formatRangeLabel(days)}</span>
+        {others.length > 0 ? (
+          <select className="stats-who" value={who} onChange={e => setWho(e.target.value)} title="Whose time to show">
+            <option value="me">Me</option>
+            <option value="all">Everyone</option>
+            {others.map(m => (
+              <option key={m.id} value={String(m.id)}>{m.username}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="stats-range-label">{formatRangeLabel(days)}</span>
+        )}
       </div>
 
       <div className="stats-scroll" style={loading && entries.length ? { opacity: 0.55 } : undefined}>
@@ -98,7 +121,10 @@ export default function Reports({ teamId }) {
               <StatTile label="Days" value={`${activeDays}/${days.length}`} />
             </div>
 
-            <div className="stats-section-title">Hours per day</div>
+            <div className="stats-section-head">
+              <span className="stats-section-title">Hours per day</span>
+              <span className="stats-range-label">{formatRangeLabel(days)}</span>
+            </div>
             <DayChart days={days} perDay={perDay} goalMs={goalMs} range={range} />
 
             {total === 0 && !loading ? (
@@ -108,6 +134,9 @@ export default function Reports({ teamId }) {
               </div>
             ) : (
               <>
+                {who !== 'me' && userRows.length > 0 && (
+                  <Breakdown title="By person" rows={userRows} total={total} />
+                )}
                 <Breakdown title="By list" rows={listRows} total={total} />
                 <Breakdown title="By task" rows={taskRows} total={total} />
               </>

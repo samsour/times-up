@@ -13,6 +13,12 @@ export async function getTeams() {
   return teams;
 }
 
+export async function getTeamMembers(teamId) {
+  const teams = await getTeams();
+  const team = (teams || []).find((t) => String(t.id) === String(teamId));
+  return (team?.members || []).map((m) => m.user).filter(Boolean);
+}
+
 export async function getSpaces(teamId) {
   const { spaces } = await api().request({
     path: `/team/${teamId}/space?archived=false`,
@@ -89,11 +95,13 @@ export async function getCurrentTimer(teamId) {
   }
 }
 
-export async function getTimeEntries(teamId, startDate, endDate) {
+export async function getTimeEntries(teamId, startDate, endDate, assignees) {
   const params = new URLSearchParams();
   if (startDate) params.set("start_date", startDate);
   if (endDate) params.set("end_date", endDate);
   params.set("include_location_names", "true");
+  // Requires workspace owner/admin to see entries other than your own
+  if (assignees && assignees.length) params.set("assignee", assignees.join(","));
   const { data } = await api().request({
     path: `/team/${teamId}/time_entries?${params.toString()}`,
   });
