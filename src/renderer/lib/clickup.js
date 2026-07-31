@@ -52,6 +52,14 @@ export async function getTasks(listId) {
   return tasks;
 }
 
+export async function createTask(listId, name) {
+  return api().request({
+    method: "POST",
+    path: `/list/${listId}/task`,
+    body: { name },
+  });
+}
+
 // Time tracking
 export async function startTimer(teamId, taskId, description = "") {
   const body = { description };

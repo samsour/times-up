@@ -165,35 +165,105 @@
   color: var(--danger);
 }
 
-.task-assign-btn {
+.task-search {
+  position: relative;
+}
+
+.task-search-box {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 0 14px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 12.5px;
-  color: var(--text-dim);
-  transition: all 0.15s;
-  width: 100%;
+  transition: border-color 0.15s;
 }
 
-.task-assign-btn:hover,
-.task-assign-btn-open {
-  border-color: var(--border-strong);
+.task-search-box:focus-within {
+  border-color: var(--accent);
+}
+
+.task-search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.task-search-input {
+  flex: 1;
+  padding: 11px 0;
+  background: transparent;
+  border: none;
+  font-size: 12.5px;
   color: var(--text);
 }
 
-.task-assign-chev {
-  margin-left: auto;
+.task-search-input::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  font-family: var(--font-display);
 }
 
-.suggestions {
+.task-search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 4px 0;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.45);
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.suggestion-item-active {
+  background: var(--bg-elevated);
+}
+
+.suggestion-recent {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.task-search-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.task-search-create {
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-style: normal;
+  color: var(--text);
+  text-align: left;
+  transition: all 0.12s;
+}
+
+.task-search-create:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.task-search-create:disabled {
+  opacity: 0.5;
 }
 
 .suggestions-loading {

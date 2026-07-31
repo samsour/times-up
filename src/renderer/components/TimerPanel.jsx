@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   startTimer,
   stopTimer,
@@ -6,6 +6,8 @@ import {
   getTimeEntries,
   getMyTasks,
   getTask,
+  searchTasks,
+  createTask,
 } from "../lib/clickup.js";
 import { formatDuration, formatDurationShort, startOfDay, endOfDay } from "../lib/time.js";
 import "./TimerPanel.css";
@@ -21,11 +23,17 @@ export default function TimerPanel({
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [suggestedTasks, setSuggestedTasks] = useState([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [recents, setRecents] = useState([]);
+  const [myTasks, setMyTasks] = useState([]);
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState(null); // null = not searching
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const [lastList, setLastList] = useState(null);
   const [lastEntry, setLastEntry] = useState(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [taskDetail, setTaskDetail] = useState(null);
+  const debounceRef = useRef(null);
   const [capacity, setCapacity] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
   const [editingStart, setEditingStart] = useState(false);
@@ -68,36 +76,84 @@ export default function TimerPanel({
     if (currentEntry?.id) setDescription(currentEntry.description || "");
   }, [currentEntry?.id]);
 
-  // Fetch full task details (includes list) when tracking a task
+  // Fetch full task details (includes list) when tracking a task,
+  // and remember its list as the default target for quick-created tasks
   useEffect(() => {
     if (!currentEntry?.task?.id) { setTaskDetail(null); return; }
-    getTask(currentEntry.task.id).then(setTaskDetail).catch(() => setTaskDetail(null));
+    getTask(currentEntry.task.id)
+      .then((t) => {
+        setTaskDetail(t);
+        if (t?.list?.id) {
+          const l = { id: t.list.id, name: t.list.name };
+          setLastList(l);
+          window.api.store.set("last_list", l);
+        }
+      })
+      .catch(() => setTaskDetail(null));
   }, [currentEntry?.task?.id]);
 
-  const isRunningUnassigned = isRunning && !currentEntry?.task;
-
-  // Fetch suggestions when idle or running unassigned
   useEffect(() => {
-    if (isRunning && !isRunningUnassigned) return;
+    window.api.store.get("last_list").then((l) => l && setLastList(l));
+  }, []);
+
+  const normalizeTask = (t, recent = false) => ({
+    id: t.id,
+    name: t.name,
+    list: t.list?.name,
+    status: t.status?.status,
+    statusColor: t.status?.color,
+    recent,
+  });
+
+  // Recently tracked tasks (deduped, newest first) + my in-progress tasks
+  useEffect(() => {
+    const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    getTimeEntries(teamId, fourteenDaysAgo, endOfDay())
+      .then((data) => {
+        const sorted = (data || []).sort(
+          (a, b) => parseInt(b.start) - parseInt(a.start)
+        );
+        if (!isRunning) setLastEntry(sorted[0] || null);
+        const seen = new Set();
+        const tasks = [];
+        for (const e of sorted) {
+          if (e.task?.id && !seen.has(e.task.id)) {
+            seen.add(e.task.id);
+            tasks.push(normalizeTask(e.task, true));
+          }
+        }
+        setRecents(tasks);
+      })
+      .catch(() => {});
     if (userId) {
-      setSuggestionsLoading(true);
       getMyTasks(teamId, userId)
-        .then((tasks) => setSuggestedTasks(tasks.slice(0, 5)))
-        .catch(() => {})
-        .finally(() => setSuggestionsLoading(false));
-    }
-    if (!isRunning) {
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      getTimeEntries(teamId, sevenDaysAgo, endOfDay())
-        .then((data) => {
-          const sorted = (data || []).sort(
-            (a, b) => parseInt(b.start) - parseInt(a.start)
-          );
-          setLastEntry(sorted[0] || null);
-        })
+        .then((tasks) => setMyTasks(tasks.map((t) => normalizeTask(t))))
         .catch(() => {});
     }
-  }, [teamId, userId, isRunning, isRunningUnassigned]);
+  }, [teamId, userId, currentEntry?.id]);
+
+  // Debounced task search
+  useEffect(() => {
+    clearTimeout(debounceRef.current);
+    const q = query.trim();
+    if (!q) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const tasks = await searchTasks(teamId, q);
+        setSearchResults(tasks.map((t) => normalizeTask(t)));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query, teamId]);
 
   function openStartEdit() {
     const d = new Date(parseInt(currentEntry.start));
@@ -142,7 +198,6 @@ export default function TimerPanel({
     setError("");
     try {
       await startTimer(teamId, taskId, desc);
-      setShowSuggestions(false);
       onChange();
     } catch (e) {
       setError(e.message);
@@ -151,17 +206,84 @@ export default function TimerPanel({
     }
   }
 
-  async function assignToRunning(taskId) {
+  // Switch the running entry to this task, or start a new timer on it
+  async function pickTask(task) {
     setBusy(true);
     setError("");
     try {
-      await updateTimeEntry(teamId, currentEntry.id, { tid: taskId });
-      setShowSuggestions(false);
+      if (isRunning) {
+        await updateTimeEntry(teamId, currentEntry.id, { tid: task.id });
+      } else {
+        await startTimer(teamId, task.id, description);
+      }
+      setQuery("");
+      setSearchOpen(false);
       onChange();
     } catch (e) {
       setError(e.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleCreateTask() {
+    const name = query.trim();
+    if (!name || !lastList) return;
+    setBusy(true);
+    setError("");
+    try {
+      const task = await createTask(lastList.id, name);
+      if (isRunning) {
+        await updateTimeEntry(teamId, currentEntry.id, { tid: task.id });
+      } else {
+        await startTimer(teamId, task.id, description);
+      }
+      setQuery("");
+      setSearchOpen(false);
+      onChange();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Build the suggestion list: recents first (they're likely what you're
+  // working on), then in-progress tasks, then server search results
+  const q = query.trim().toLowerCase();
+  const currentTaskId = currentEntry?.task?.id;
+  let searchItems;
+  if (!q) {
+    const seen = new Set();
+    searchItems = [...recents, ...myTasks]
+      .filter((t) => t.id !== currentTaskId && !seen.has(t.id) && seen.add(t.id))
+      .slice(0, 8);
+  } else {
+    const matches = (t) => t.name.toLowerCase().includes(q);
+    const recentMatches = recents.filter(matches);
+    const seen = new Set(recentMatches.map((t) => t.id));
+    const rest = [...myTasks.filter(matches), ...(searchResults || [])].filter(
+      (t) => !seen.has(t.id) && seen.add(t.id)
+    );
+    searchItems = [...recentMatches, ...rest]
+      .filter((t) => t.id !== currentTaskId)
+      .slice(0, 10);
+  }
+  const searchSettled = !q || (!searchLoading && searchResults !== null);
+  const showCreate = q && searchSettled && searchItems.length === 0 && lastList;
+
+  function handleSearchKeys(e) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(h + 1, searchItems.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(h - 1, 0));
+    } else if (e.key === "Enter") {
+      if (searchItems[highlight]) pickTask(searchItems[highlight]);
+      else if (showCreate) handleCreateTask();
+    } else if (e.key === "Escape") {
+      e.target.blur();
     }
   }
 
@@ -313,87 +435,94 @@ export default function TimerPanel({
 
       {error && <div className="timer-error">{error}</div>}
 
-      {/* Assign task button + collapsible suggestions */}
-      {(!isRunning || isRunningUnassigned) && (
-        <>
-          <button
-            className={`task-assign-btn ${
-              showSuggestions ? "task-assign-btn-open" : ""
-            }`}
-            onClick={() => setShowSuggestions((v) => !v)}
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M9 11l3 3 8-8M20 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h11" />
-            </svg>
-            Assign a task
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="task-assign-chev"
-            >
-              <path d={showSuggestions ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"} />
-            </svg>
-          </button>
+      {/* Task search: recents when empty, live search when typing */}
+      <div className="task-search">
+        <div className="task-search-box">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="task-search-icon">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            className="task-search-input"
+            placeholder={isRunning ? "Switch to another task…" : "Find or start a task…"}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setHighlight(0);
+            }}
+            onFocus={() => setSearchOpen(true)}
+            onBlur={() => setSearchOpen(false)}
+            onKeyDown={handleSearchKeys}
+          />
+        </div>
 
-          {showSuggestions && (
-            <div className="suggestions">
-              {suggestionsLoading && (
-                <div className="suggestions-loading">Loading tasks…</div>
-              )}
-              {!suggestionsLoading && suggestedTasks.map((task) => (
-                <button
-                  key={task.id}
-                  className="suggestion-item"
-                  onClick={() => isRunningUnassigned ? assignToRunning(task.id) : startWithTask(task.id)}
-                >
-                  <div className="suggestion-info">
-                    <span className="suggestion-name">{task.name}</span>
-                    <span className="suggestion-meta">
-                      {task.list?.name && (
-                        <span className="suggestion-list">{task.list.name}</span>
-                      )}
-                      {task.list?.name && task.status?.status && (
-                        <span className="suggestion-meta-sep">·</span>
-                      )}
-                      {task.status?.status && (
-                        <span
-                          className="suggestion-status"
-                          style={{ color: task.status.color || "var(--text-muted)" }}
-                        >
-                          {task.status.status}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="suggestion-play">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </button>
-              ))}
+        {searchOpen && (
+          <div className="task-search-dropdown">
+            {searchItems.map((task, i) => (
               <button
-                className="suggestions-browse"
-                onClick={() => {
-                  setShowSuggestions(false);
-                  onBrowse();
-                }}
+                key={task.id}
+                className={`suggestion-item ${i === highlight ? "suggestion-item-active" : ""}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setHighlight(i)}
+                onClick={() => pickTask(task)}
+                disabled={busy}
               >
-                Browse all tasks →
+                <div className="suggestion-info">
+                  <span className="suggestion-name">{task.name}</span>
+                  <span className="suggestion-meta">
+                    {task.recent && <span className="suggestion-recent">recent</span>}
+                    {task.list && <span className="suggestion-list">{task.list}</span>}
+                    {task.status && (
+                      <span
+                        className="suggestion-status"
+                        style={{ color: task.statusColor || "var(--text-muted)" }}
+                      >
+                        {task.status}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="suggestion-play">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
               </button>
-            </div>
-          )}
-        </>
-      )}
+            ))}
+
+            {q && !searchSettled && searchItems.length === 0 && (
+              <div className="suggestions-loading">Searching…</div>
+            )}
+            {q && searchSettled && searchItems.length === 0 && (
+              <div className="task-search-empty">
+                <span>No tasks found.</span>
+                {showCreate && (
+                  <button
+                    className="task-search-create"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={handleCreateTask}
+                    disabled={busy}
+                  >
+                    + Create “{query.trim()}” in {lastList.name}
+                  </button>
+                )}
+              </div>
+            )}
+            {!q && searchItems.length === 0 && (
+              <div className="suggestions-loading">No recent tasks yet.</div>
+            )}
+
+            <button
+              className="suggestions-browse"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setSearchOpen(false);
+                onBrowse();
+              }}
+            >
+              Browse all tasks →
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Last entry quick-start */}
       {!isRunning && lastEntry && (

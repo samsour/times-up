@@ -11,9 +11,47 @@
   padding: 8px 0 16px;
 }
 
+.timetable-days-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 0 4px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.timetable-days-spacer {
+  flex-shrink: 0;
+}
+
+.timetable-day-label {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.timetable-day-today {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.timetable-day-sep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
 .timetable-inner {
   position: relative;
-  cursor: crosshair;
+  cursor: default;
   user-select: none;
 }
 
@@ -79,9 +117,13 @@
 
 .timetable-block {
   position: absolute;
-  cursor: grab;
+  cursor: pointer;
   background: var(--accent-dim);
   border-left: 2px solid var(--accent);
+  /* bg-colored top/bottom borders keep back-to-back entries visually separate */
+  border-top: 1px solid var(--bg);
+  border-bottom: 1px solid var(--bg);
+  background-clip: padding-box;
   border-radius: 0 4px 4px 0;
   padding: 3px 6px;
   overflow: hidden;
@@ -272,4 +314,77 @@
 .draft-save:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.timetable-edit-form {
+  cursor: default;
+}
+
+.edit-times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-times-sep {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.edit-select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.edit-task-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 130px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.edit-task-result {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  padding: 5px 8px;
+  border-radius: 3px;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.edit-task-result:hover {
+  background: var(--bg-hover);
+}
+
+.edit-task-result-name {
+  font-size: 11.5px;
+  color: var(--text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.edit-task-result-meta {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.edit-task-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 5px 8px;
 }
