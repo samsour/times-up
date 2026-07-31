@@ -43,9 +43,10 @@ export default function Reports({ teamId }) {
 
   const days = rangeDays(range)
 
-  // Aggregate per day and per task
+  // Aggregate per day, per task and per list
   const perDay = {}
   const perTask = {}
+  const perList = {}
   let total = 0
   for (const e of entries) {
     const ms = parseInt(e.duration)
@@ -54,6 +55,9 @@ export default function Reports({ teamId }) {
     const taskId = e.task?.id || 'none'
     if (!perTask[taskId]) perTask[taskId] = { id: taskId, name: e.task?.name || 'No task', ms: 0 }
     perTask[taskId].ms += ms
+    const listId = e.task_location?.list_id || 'none'
+    if (!perList[listId]) perList[listId] = { id: listId, name: e.task_location?.list_name || 'No list', ms: 0 }
+    perList[listId].ms += ms
     total += ms
   }
 
@@ -69,7 +73,7 @@ export default function Reports({ teamId }) {
       ms: ranked.slice(MAX_TASK_ROWS).reduce((s, t) => s + t.ms, 0),
     })
   }
-  const maxTaskMs = taskRows.length ? taskRows[0].ms : 0
+  const listRows = Object.values(perList).sort((a, b) => b.ms - a.ms)
 
   return (
     <div className="stats">
@@ -104,27 +108,37 @@ export default function Reports({ teamId }) {
               </div>
             ) : (
               <>
-                <div className="stats-section-title">By task</div>
-                <div className="stats-tasks">
-                  {taskRows.map(row => (
-                    <div key={row.id} className="task-row" title={row.name}>
-                      <div className="task-row-top">
-                        <span className="task-row-name">{row.name}</span>
-                        <span className="task-row-pct">{total ? Math.round((row.ms / total) * 100) : 0}%</span>
-                        <span className="task-row-val">{formatDurationShort(row.ms)}</span>
-                      </div>
-                      <div className="task-row-track">
-                        <div className="task-row-bar" style={{ width: `${maxTaskMs ? (row.ms / maxTaskMs) * 100 : 0}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <Breakdown title="By list" rows={listRows} total={total} />
+                <Breakdown title="By task" rows={taskRows} total={total} />
               </>
             )}
           </>
         )}
       </div>
     </div>
+  )
+}
+
+function Breakdown({ title, rows, total }) {
+  const maxMs = rows.length ? rows[0].ms : 0
+  return (
+    <>
+      <div className="stats-section-title">{title}</div>
+      <div className="stats-tasks">
+        {rows.map(row => (
+          <div key={row.id} className="task-row" title={row.name}>
+            <div className="task-row-top">
+              <span className="task-row-name">{row.name}</span>
+              <span className="task-row-pct">{total ? Math.round((row.ms / total) * 100) : 0}%</span>
+              <span className="task-row-val">{formatDurationShort(row.ms)}</span>
+            </div>
+            <div className="task-row-track">
+              <div className="task-row-bar" style={{ width: `${maxMs ? (row.ms / maxMs) * 100 : 0}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 

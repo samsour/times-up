@@ -93,6 +93,7 @@ export async function getTimeEntries(teamId, startDate, endDate) {
   const params = new URLSearchParams();
   if (startDate) params.set("start_date", startDate);
   if (endDate) params.set("end_date", endDate);
+  params.set("include_location_names", "true");
   const { data } = await api().request({
     path: `/team/${teamId}/time_entries?${params.toString()}`,
   });
