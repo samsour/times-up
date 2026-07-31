@@ -3,6 +3,7 @@ import TimerPanel from './TimerPanel.jsx'
 import TaskPicker from './TaskPicker.jsx'
 import History from './History.jsx'
 import Timetable from './Timetable.jsx'
+import Reports from './Reports.jsx'
 import Settings from './Settings.jsx'
 import IdlePrompt from './IdlePrompt.jsx'
 import { getCurrentTimer, startTimer, updateTimeEntry } from '../lib/clickup.js'
@@ -67,6 +68,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
           <TabBtn active={view === 'tasks'} onClick={() => setView('tasks')}>Tasks</TabBtn>
           <TabBtn active={view === 'timetable'} onClick={() => setView('timetable')}>Day</TabBtn>
           <TabBtn active={view === 'history'} onClick={() => setView('history')}>Log</TabBtn>
+          <TabBtn active={view === 'reports'} onClick={() => setView('reports')}>Stats</TabBtn>
         </div>
         <button
           className={`tracker-settings ${view === 'settings' ? 'tracker-settings-active' : ''}`}
@@ -102,6 +104,9 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
         )}
         {view === 'history' && (
           <History teamId={teamId} key={refreshKey} onChange={bumpRefresh} onRestart={() => setView('timer')} />
+        )}
+        {view === 'reports' && (
+          <Reports teamId={teamId} key={refreshKey} />
         )}
         {view === 'settings' && (
           <Settings

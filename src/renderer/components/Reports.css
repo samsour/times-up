@@ -1,0 +1,240 @@
+.stats {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-range-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px 16px;
+  transition: opacity 0.15s;
+}
+
+.stats-empty,
+.stats-error {
+  padding: 32px 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-style: italic;
+  line-height: 1.7;
+}
+
+.stats-empty-em {
+  font-size: 16px;
+  color: var(--text-dim);
+}
+
+.stats-error {
+  color: var(--danger);
+}
+
+/* KPI tiles */
+.stats-tiles {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-tile {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+}
+
+.stat-tile-label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.stat-tile-value {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+/* Day chart */
+.stats-chart-wrap {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  opacity: 0.5;
+  shape-rendering: crispEdges;
+}
+
+.chart-baseline {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart-axis-label {
+  font-size: 9px;
+  fill: var(--text-muted);
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-axis-today {
+  fill: var(--text);
+  font-weight: 600;
+}
+
+.chart-bar {
+  fill: var(--accent);
+  transition: fill 0.1s;
+}
+
+.chart-bar-hover {
+  fill: var(--text);
+}
+
+.chart-goal {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart-goal-label {
+  font-size: 8.5px;
+  fill: var(--text-muted);
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.chart-value-label {
+  font-size: 9.5px;
+  fill: var(--text-dim);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: -4px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.chart-tooltip-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.chart-tooltip-date {
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+/* Task breakdown */
+.stats-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+
+.task-row {
+  min-width: 0;
+}
+
+.task-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.task-row-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-row-pct {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.task-row-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.task-row-track {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.task-row-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.25s ease-out;
+}

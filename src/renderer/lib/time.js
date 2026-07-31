@@ -60,3 +60,18 @@ export function endOfDay(date = new Date()) {
   d.setHours(23, 59, 59, 999)
   return d.getTime()
 }
+
+export function startOfWeek(date = new Date()) {
+  const d = new Date(date)
+  const day = (d.getDay() + 6) % 7 // Monday-based
+  d.setDate(d.getDate() - day)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+export function startOfMonth(date = new Date()) {
+  const d = new Date(date)
+  d.setDate(1)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
