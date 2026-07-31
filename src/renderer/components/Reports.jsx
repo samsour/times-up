@@ -34,7 +34,9 @@ export default function Reports({ teamId, userId }) {
       let assignees = null
       if (who === 'all') assignees = members.map(m => m.id)
       else if (who !== 'me') assignees = [who]
-      const data = await getTimeEntries(teamId, days[0], endOfDay(new Date(days[days.length - 1])), assignees)
+      // All time: ClickUp defaults to the last 30 days without a start_date, so pass epoch-ish 1
+      const start = days ? days[0] : 1
+      const data = await getTimeEntries(teamId, start, endOfDay(), assignees)
       setEntries((data || []).filter(e => parseInt(e.duration) > 0))
     } catch (e) {
       setError(e.message)
@@ -72,8 +74,9 @@ export default function Reports({ teamId, userId }) {
     total += ms
   }
 
-  const activeDays = days.filter(d => perDay[d] > 0).length
+  const activeDays = days ? days.filter(d => perDay[d] > 0).length : Object.keys(perDay).length
   const avgPerDay = activeDays ? total / activeDays : 0
+  const earliest = entries.reduce((min, e) => Math.min(min, parseInt(e.start)), Infinity)
 
   const ranked = Object.values(perTask).sort((a, b) => b.ms - a.ms)
   const taskRows = ranked.slice(0, MAX_TASK_ROWS)
@@ -94,7 +97,8 @@ export default function Reports({ teamId, userId }) {
         <div className="history-tabs">
           <button className={`mini-tab ${range === 'week' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('week')}>Week</button>
           <button className={`mini-tab ${range === 'month' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('month')}>Month</button>
-          <button className={`mini-tab ${range === '30d' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('30d')}>30 Days</button>
+          <button className={`mini-tab ${range === '30d' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('30d')}>30d</button>
+          <button className={`mini-tab ${range === 'all' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('all')}>All</button>
         </div>
         {others.length > 0 ? (
           <select className="stats-who" value={who} onChange={e => setWho(e.target.value)} title="Whose time to show">
@@ -105,7 +109,7 @@ export default function Reports({ teamId, userId }) {
             ))}
           </select>
         ) : (
-          <span className="stats-range-label">{formatRangeLabel(days)}</span>
+          <span className="stats-range-label">{days ? formatRangeLabel(days) : 'All time'}</span>
         )}
       </div>
 
@@ -118,14 +122,26 @@ export default function Reports({ teamId, userId }) {
             <div className="stats-tiles">
               <StatTile label="Total" value={formatDurationShort(total)} />
               <StatTile label="Avg / day" value={formatDurationShort(avgPerDay)} />
-              <StatTile label="Days" value={`${activeDays}/${days.length}`} />
+              <StatTile label="Days" value={days ? `${activeDays}/${days.length}` : `${activeDays}`} />
+              {!days && (
+                <StatTile
+                  label="Since"
+                  value={isFinite(earliest)
+                    ? new Date(earliest).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+                    : '—'}
+                />
+              )}
             </div>
 
-            <div className="stats-section-head">
-              <span className="stats-section-title">Hours per day</span>
-              <span className="stats-range-label">{formatRangeLabel(days)}</span>
-            </div>
-            <DayChart days={days} perDay={perDay} goalMs={goalMs} range={range} />
+            {days && (
+              <>
+                <div className="stats-section-head">
+                  <span className="stats-section-title">Hours per day</span>
+                  <span className="stats-range-label">{formatRangeLabel(days)}</span>
+                </div>
+                <DayChart days={days} perDay={perDay} goalMs={goalMs} range={range} />
+              </>
+            )}
 
             {total === 0 && !loading ? (
               <div className="stats-empty">
@@ -304,6 +320,7 @@ function DayChart({ days, perDay, goalMs, range }) {
 
 function rangeDays(range) {
   const now = new Date()
+  if (range === 'all') return null // no per-day frame — summary only
   if (range === 'week') return listDays(new Date(startOfWeek(now)), 7)
   if (range === 'month') {
     const count = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
