@@ -1,6 +1,8 @@
 .timetable {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   animation: fadeIn 0.2s ease-out;
 }
@@ -119,13 +121,13 @@
   position: absolute;
   cursor: pointer;
   background: var(--accent-dim);
-  border-left: 2px solid var(--accent);
+  border-left: 3px solid var(--accent);
   /* bg-colored top/bottom borders keep back-to-back entries visually separate */
   border-top: 1px solid var(--bg);
   border-bottom: 1px solid var(--bg);
   background-clip: padding-box;
-  border-radius: 0 4px 4px 0;
-  padding: 3px 6px;
+  border-radius: 0 7px 7px 0;
+  padding: 3px 7px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -135,20 +137,20 @@
 }
 
 .timetable-block:hover {
-  background: rgba(136, 136, 136, 0.2);
+  background: rgba(255, 122, 89, 0.28);
 }
 
 [data-theme="light"] .timetable-block:hover {
-  background: rgba(68, 68, 68, 0.14);
+  background: rgba(232, 84, 58, 0.22);
 }
 
 .timetable-block-live {
   border-left-color: var(--success);
-  background: rgba(74, 222, 128, 0.06);
+  background: rgba(74, 222, 128, 0.1);
 }
 
 [data-theme="light"] .timetable-block-live {
-  background: rgba(22, 163, 74, 0.06);
+  background: rgba(22, 163, 74, 0.09);
 }
 
 .timetable-block-live .timetable-block-name {
@@ -220,8 +222,8 @@
 .timetable-drag-preview {
   position: absolute;
   background: var(--accent-dim);
-  border-left: 2px solid var(--accent);
-  border-radius: 0 4px 4px 0;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 7px 7px 0;
   pointer-events: none;
   z-index: 2;
   display: flex;
@@ -240,13 +242,12 @@
   position: absolute;
   z-index: 10;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 10px;
+  border-radius: var(--radius);
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.06);
   cursor: default;
 }
 
@@ -266,10 +267,10 @@
 }
 
 .draft-input {
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  padding: 6px 8px;
+  background: var(--bg-hover);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
   font-size: 12px;
   color: var(--text);
   width: 100%;
@@ -278,7 +279,7 @@
 }
 
 .draft-input:focus {
-  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
 .draft-actions {
@@ -287,11 +288,50 @@
   justify-content: flex-end;
 }
 
-.draft-cancel {
-  padding: 4px 10px;
+.timetable-block-cont {
+  opacity: 0.7;
+  border-top: 2px dashed var(--border-strong);
+  cursor: default;
+}
+
+.timetable-block-cont-hint {
+  color: var(--text-muted);
+}
+
+.timetable-drop-preview {
+  border: 1px dashed var(--border-strong);
+  pointer-events: none;
+}
+
+.timetable-block-hl {
+  border-color: var(--border-strong);
+  filter: brightness(1.15);
+}
+
+.edit-delete {
+  margin-right: auto;
+  padding: 5px 12px;
   font-size: 11px;
   color: var(--text-muted);
-  border-radius: 4px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.edit-delete:hover {
+  color: var(--danger);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.edit-delete:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.draft-cancel {
+  padding: 5px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-radius: 999px;
   cursor: pointer;
 }
 
@@ -301,14 +341,18 @@
 }
 
 .draft-save {
-  padding: 4px 12px;
+  padding: 5px 16px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   background: var(--cta-bg);
   color: var(--cta-text);
-  border-radius: 4px;
+  border-radius: 999px;
   cursor: pointer;
-  transition: opacity 0.1s;
+  transition: filter 0.1s;
+}
+
+.draft-save:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
 .draft-save:disabled {
@@ -345,9 +389,9 @@
   gap: 1px;
   max-height: 130px;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 2px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  padding: 3px;
 }
 
 .edit-task-result {

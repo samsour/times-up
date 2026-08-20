@@ -1,0 +1,255 @@
+.timer-bar-wrap {
+  flex-shrink: 0;
+}
+
+.timer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 10px;
+}
+
+.timer-bar-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.12s;
+}
+
+.timer-bar-btn-start {
+  background: var(--cta-bg);
+  color: var(--cta-text);
+  box-shadow: 0 2px 8px var(--accent-dim);
+}
+
+.timer-bar-btn-start:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: scale(1.05);
+}
+
+.timer-bar-btn-stop {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.timer-bar-btn-stop:hover:not(:disabled) {
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+.timer-bar-btn:disabled {
+  opacity: 0.5;
+}
+
+.timer-bar-time {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.timer-bar-middle {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.timer-bar-input {
+  width: 100%;
+  padding: 7px 14px;
+  font-size: 11.5px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 999px;
+}
+
+.timer-bar-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.timer-bar-input::placeholder {
+  color: var(--text-muted);
+}
+
+.timer-bar-note {
+  background: transparent;
+}
+
+.timer-bar-note:hover {
+  background: var(--bg-elevated);
+}
+
+.timer-bar-task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  transition: background 0.12s;
+}
+
+.timer-bar-task:hover {
+  background: var(--bg-hover);
+}
+
+.timer-bar-task svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.timer-bar-task-name {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timer-bar-since {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 10px;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+
+.timer-bar-since:hover {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.timer-bar-since-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.timer-bar-since-input {
+  font-size: 10.5px;
+  padding: 3px 5px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.timer-bar-since-ok,
+.timer-bar-since-cancel {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+}
+
+.timer-bar-since-ok:hover,
+.timer-bar-since-cancel:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+/* dropdown */
+
+.timer-bar-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.suggestion-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 10px;
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+
+.suggestion-row-active {
+  background: var(--bg-hover);
+}
+
+.suggestion-row-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.suggestion-row-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.suggestion-row-recent {
+  font-style: italic;
+}
+
+.suggestion-note {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.suggestion-browse {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+.suggestion-browse:hover {
+  background: var(--accent-dim);
+}
+
+/* daily goal hairline */
+
+.timer-bar-progress {
+  height: 3px;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  margin: 0 12px;
+}
+
+.timer-bar-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.timer-bar-progress-done {
+  background: var(--success);
+}

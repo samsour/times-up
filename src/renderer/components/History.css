@@ -9,30 +9,31 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
 }
 
 .history-tabs {
   display: flex;
-  gap: 2px;
+  gap: 3px;
   background: var(--bg-elevated);
-  padding: 2px;
-  border-radius: 6px;
+  padding: 3px;
+  border-radius: 999px;
 }
 
 .mini-tab {
-  padding: 4px 10px;
+  padding: 4px 12px;
   font-size: 10.5px;
   font-weight: 500;
   color: var(--text-muted);
-  border-radius: 4px;
+  border-radius: 999px;
   letter-spacing: 0.02em;
+  transition: all 0.12s;
 }
 
 .mini-tab-active {
   background: var(--bg);
-  color: var(--text);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .history-total {
@@ -186,8 +187,8 @@
 }
 
 .entry-restart {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -207,8 +208,8 @@
 }
 
 .entry-delete {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;

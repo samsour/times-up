@@ -59,11 +59,87 @@ export async function getTasks(listId) {
 }
 
 export async function createTask(listId, name) {
-  return api().request({
+  const task = await api().request({
     method: "POST",
     path: `/list/${listId}/task`,
     body: { name },
   });
+  invalidateTaskCache();
+  return task;
+}
+
+export async function updateTask(taskId, body) {
+  return api().request({
+    method: "PUT",
+    path: `/task/${taskId}`,
+    body,
+  });
+}
+
+export async function getListStatuses(listId) {
+  const list = await api().request({ path: `/list/${listId}` });
+  return list?.statuses || [];
+}
+
+// Every list in the workspace, flattened with a readable path and its color
+// (the list's own color label, falling back to the space color)
+export async function getAllLists(teamId) {
+  const spaces = (await getSpaces(teamId)) || [];
+  const out = [];
+  await Promise.all(
+    spaces.map(async (s) => {
+      const [folders, lists] = await Promise.all([
+        getFolders(s.id).catch(() => []),
+        getFolderlessLists(s.id).catch(() => []),
+      ]);
+      const listColor = (l) => l.status?.color || s.color || null;
+      for (const l of lists || [])
+        out.push({ id: l.id, name: l.name, path: s.name, color: listColor(l) });
+      await Promise.all(
+        (folders || []).map(async (f) => {
+          const fl = await getListsInFolder(f.id).catch(() => []);
+          for (const l of fl || [])
+            out.push({ id: l.id, name: l.name, path: `${s.name} / ${f.name}`, color: listColor(l) });
+        })
+      );
+    })
+  );
+  return out.sort((a, b) => a.path.localeCompare(b.path) || a.name.localeCompare(b.name));
+}
+
+// listId -> color, cached (walking spaces/folders is a handful of requests)
+let listColorCache = { at: 0, teamId: null, map: null };
+
+export async function getListColors(teamId) {
+  if (
+    listColorCache.map &&
+    listColorCache.teamId === teamId &&
+    Date.now() - listColorCache.at < 10 * 60000
+  ) {
+    return listColorCache.map;
+  }
+  const map = {};
+  try {
+    for (const l of await getAllLists(teamId)) {
+      if (l.color) map[l.id] = l.color;
+    }
+  } catch {}
+  listColorCache = { at: Date.now(), teamId, map };
+  return map;
+}
+
+// If the task still sits in a backlog-type status ("open"), move it to the
+// list's in-progress-like status. Returns the change for undo, or null.
+export async function advanceTaskStatus(taskId) {
+  const task = await getTask(taskId);
+  if (!task?.status || task.status.type !== "open") return null;
+  const statuses = await getListStatuses(task.list?.id);
+  const target =
+    statuses.find((s) => /progress/i.test(s.status)) ||
+    statuses.find((s) => s.type === "custom" && s.status !== task.status.status);
+  if (!target) return null;
+  await updateTask(taskId, { status: target.status });
+  return { taskId, name: task.name, from: task.status.status, to: target.status };
 }
 
 // Time tracking
@@ -131,11 +207,47 @@ export async function deleteTimeEntry(teamId, entryId) {
   });
 }
 
+// The filtered-team-tasks endpoint has no name filter, so fetch the most
+// recently updated tasks once (5 pages, ~60s cache) and match client-side.
+let taskCache = { at: 0, teamId: null, tasks: null };
+
+export function invalidateTaskCache() {
+  taskCache.at = 0;
+}
+
 export async function searchTasks(teamId, query) {
-  const { tasks } = await api().request({
-    path: `/team/${teamId}/task?name=${encodeURIComponent(query)}&include_closed=false&page=0`,
-  });
-  return tasks || [];
+  const q = (query || "").trim().toLowerCase();
+  if (!q) return [];
+  if (
+    !taskCache.tasks ||
+    taskCache.teamId !== teamId ||
+    Date.now() - taskCache.at > 60000
+  ) {
+    const pages = await Promise.all(
+      [0, 1, 2, 3, 4].map((page) =>
+        api()
+          .request({
+            path: `/team/${teamId}/task?subtasks=true&include_closed=false&order_by=updated&page=${page}`,
+          })
+          .then((r) => r.tasks || [])
+          .catch(() => [])
+      )
+    );
+    const seen = new Set();
+    taskCache = {
+      at: Date.now(),
+      teamId,
+      tasks: pages.flat().filter((t) => !seen.has(t.id) && seen.add(t.id)),
+    };
+  }
+  const starts = [];
+  const contains = [];
+  for (const t of taskCache.tasks) {
+    const name = (t.name || "").toLowerCase();
+    if (name.startsWith(q)) starts.push(t);
+    else if (name.includes(q)) contains.push(t);
+  }
+  return [...starts, ...contains].slice(0, 50);
 }
 
 export async function getMyTasks(teamId, userId) {

@@ -45,6 +45,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
   const [dailyGoalHours, setDailyGoalHours] = useState('')
+  const [autoProgress, setAutoProgress] = useState(true)
   const [updateState, setUpdateState] = useState('idle')
   const [exportPreset, setExportPreset] = useState('week') // 'week' | 'month' | 'custom'
   const [exportFrom, setExportFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-01` })
@@ -57,6 +58,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
     window.api.store.get('daily_goal_hours').then(v => setDailyGoalHours(v || ''))
+    window.api.store.get('auto_progress').then(v => setAutoProgress(v !== false))
     window.api.updater.getState().then(setUpdateState)
     return window.api.updater.onStateChange(setUpdateState)
   }, [])
@@ -225,6 +227,25 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
             />
             <span className="settings-number-unit">h / day</span>
           </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-label">ClickUp</div>
+        <div className="settings-row">
+          <span className="settings-row-title" title="When you track time on a task that is still in a backlog status, move it to the list's In Progress status">
+            Auto-move to In Progress
+          </span>
+          <button
+            className={`settings-toggle ${autoProgress ? 'settings-toggle-on' : ''}`}
+            onClick={async () => {
+              const next = !autoProgress
+              setAutoProgress(next)
+              await window.api.store.set('auto_progress', next)
+            }}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
         </div>
       </div>
 
