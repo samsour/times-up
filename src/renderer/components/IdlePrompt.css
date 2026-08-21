@@ -33,13 +33,13 @@
 }
 
 .idle-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
 }
 
 .idle-body {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
   line-height: 1.5;
 }
@@ -61,7 +61,7 @@
   width: 100%;
   padding: 10px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   transition: all 0.12s;
 }
@@ -86,7 +86,7 @@
 }
 
 .idle-btn-stop {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   padding: 6px;
 }

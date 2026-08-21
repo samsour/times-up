@@ -5,12 +5,12 @@
   padding: 7px 16px;
   background: var(--accent);
   color: #fff;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
 }
 
 .update-banner button {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #fff;
   padding: 2px 8px;
@@ -49,7 +49,7 @@
 
 .tab {
   padding: 6px 14px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-muted);
   border-radius: 999px;
@@ -123,7 +123,7 @@
 }
 
 .tracker-toast-text {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -132,7 +132,7 @@
 
 .tracker-toast-undo {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   padding: 3px 10px;

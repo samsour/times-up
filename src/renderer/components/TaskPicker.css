@@ -36,7 +36,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .picker-search:focus {
@@ -55,7 +55,7 @@
   align-items: center;
   gap: 4px;
   padding: 10px 16px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -66,7 +66,7 @@
 }
 
 .crumb {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   letter-spacing: 0.02em;
   transition: color 0.12s;
@@ -83,7 +83,7 @@
 
 .crumb-sep {
   color: var(--border-strong);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .picker-list {
@@ -97,7 +97,7 @@
 .picker-error {
   padding: 24px 12px;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   font-family: var(--font-display);
   font-style: italic;
@@ -139,7 +139,7 @@
 
 .picker-item-name {
   flex: 1;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -159,7 +159,7 @@
 }
 
 .picker-item-context {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -167,7 +167,7 @@
 }
 
 .picker-status {
-  font-size: 9.5px;
+  font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 600;

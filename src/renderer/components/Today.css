@@ -24,7 +24,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-muted);
   border-radius: 999px;
   background: var(--bg-elevated);
@@ -43,7 +43,7 @@
 .today-nav-label {
   min-width: 82px;
   padding: 3px 8px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   text-align: center;
   color: var(--text);
@@ -66,7 +66,7 @@
 }
 
 .today-total-label {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
@@ -74,7 +74,7 @@
 
 .today-total-value {
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--accent);
 }
 
@@ -123,7 +123,7 @@
 
 .today-rail-empty {
   padding: 18px 6px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-dim);
   text-align: center;
@@ -163,7 +163,7 @@
 }
 
 .entry-card-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text);
   line-height: 1.3;
@@ -182,7 +182,7 @@
 }
 
 .entry-card-status {
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -191,7 +191,7 @@
 
 .entry-card-list,
 .entry-card-unassigned {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -211,7 +211,7 @@
 
 .entry-card-total {
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -252,7 +252,7 @@
 }
 
 .entry-card-range {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -282,7 +282,7 @@
 .entry-card-action {
   flex: 1;
   padding: 6px 0;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-dim);
   background: var(--bg-hover);
@@ -319,14 +319,14 @@
 }
 
 .create-list-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-muted);
   margin-right: 2px;
 }
 
 .create-list-chip {
   padding: 3px 10px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--text-dim);
   background: var(--bg-hover);

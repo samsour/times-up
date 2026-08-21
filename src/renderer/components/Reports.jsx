@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getTimeEntries, getTeamMembers } from '../lib/clickup.js'
+import { getTimeEntries, getTeamMembers, getListColors } from '../lib/clickup.js'
 import { formatDurationShort, startOfDay, endOfDay, startOfWeek, startOfMonth } from '../lib/time.js'
 import './Reports.css'
 
@@ -13,6 +13,11 @@ export default function Reports({ teamId, userId }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [goalMs, setGoalMs] = useState(0)
+  const [listColors, setListColors] = useState({})
+
+  useEffect(() => {
+    getListColors(teamId).then(setListColors).catch(() => {})
+  }, [teamId])
 
   useEffect(() => {
     window.api.store.get('stats_range').then(r => { if (r) setRange(r) })
@@ -63,7 +68,7 @@ export default function Reports({ teamId, userId }) {
     const dayKey = startOfDay(new Date(parseInt(e.start)))
     perDay[dayKey] = (perDay[dayKey] || 0) + ms
     const taskId = e.task?.id || 'none'
-    if (!perTask[taskId]) perTask[taskId] = { id: taskId, name: e.task?.name || 'No task', ms: 0 }
+    if (!perTask[taskId]) perTask[taskId] = { id: taskId, name: e.task?.name || 'No task', ms: 0, listId: e.task_location?.list_id }
     perTask[taskId].ms += ms
     const listId = e.task_location?.list_id || 'none'
     if (!perList[listId]) perList[listId] = { id: listId, name: e.task_location?.list_name || 'No list', ms: 0 }
@@ -78,7 +83,9 @@ export default function Reports({ teamId, userId }) {
   const avgPerDay = activeDays ? total / activeDays : 0
   const earliest = entries.reduce((min, e) => Math.min(min, parseInt(e.start)), Infinity)
 
-  const ranked = Object.values(perTask).sort((a, b) => b.ms - a.ms)
+  const ranked = Object.values(perTask)
+    .sort((a, b) => b.ms - a.ms)
+    .map(t => ({ ...t, color: listColors[t.listId] }))
   const taskRows = ranked.slice(0, MAX_TASK_ROWS)
   if (ranked.length > MAX_TASK_ROWS) {
     taskRows.push({
@@ -87,7 +94,9 @@ export default function Reports({ teamId, userId }) {
       ms: ranked.slice(MAX_TASK_ROWS).reduce((s, t) => s + t.ms, 0),
     })
   }
-  const listRows = Object.values(perList).sort((a, b) => b.ms - a.ms)
+  const listRows = Object.values(perList)
+    .sort((a, b) => b.ms - a.ms)
+    .map(l => ({ ...l, color: listColors[l.id] }))
   const userRows = Object.values(perUser).sort((a, b) => b.ms - a.ms)
   const others = members.filter(m => String(m.id) !== String(userId))
 
@@ -178,7 +187,13 @@ function Breakdown({ title, rows, total }) {
               <span className="task-row-val">{formatDurationShort(row.ms)}</span>
             </div>
             <div className="task-row-track">
-              <div className="task-row-bar" style={{ width: `${maxMs ? (row.ms / maxMs) * 100 : 0}%` }} />
+              <div
+                className="task-row-bar"
+                style={{
+                  width: `${maxMs ? (row.ms / maxMs) * 100 : 0}%`,
+                  ...(row.color ? { background: row.color } : {}),
+                }}
+              />
             </div>
           </div>
         ))}
