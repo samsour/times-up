@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getTimeEntries, getTeamMembers, getListColors } from '../lib/clickup.js'
+import { getTimeEntries, getTeamMembers, getListColors, canViewOthersTime } from '../lib/clickup.js'
 import { formatDurationShort, startOfDay, endOfDay, startOfWeek, startOfMonth } from '../lib/time.js'
 import './Reports.css'
 
@@ -25,7 +25,10 @@ export default function Reports({ teamId, userId }) {
     getTeamMembers(teamId).then(setMembers).catch(() => {})
   }, [teamId])
 
+  const isAdmin = canViewOthersTime(members, userId)
+
   useEffect(() => {
+    if (!isAdmin && who !== 'me') { setWho('me'); return }
     if (who === 'all' && !members.length) return // wait for member list
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -37,8 +40,8 @@ export default function Reports({ teamId, userId }) {
     try {
       const days = rangeDays(range)
       let assignees = null
-      if (who === 'all') assignees = members.map(m => m.id)
-      else if (who !== 'me') assignees = [who]
+      if (isAdmin && who === 'all') assignees = members.map(m => m.id)
+      else if (isAdmin && who !== 'me') assignees = [who]
       // All time: ClickUp defaults to the last 30 days without a start_date, so pass epoch-ish 1
       const start = days ? days[0] : 1
       const data = await getTimeEntries(teamId, start, endOfDay(), assignees)
@@ -109,7 +112,7 @@ export default function Reports({ teamId, userId }) {
           <button className={`mini-tab ${range === '30d' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('30d')}>30d</button>
           <button className={`mini-tab ${range === 'all' ? 'mini-tab-active' : ''}`} onClick={() => pickRange('all')}>All</button>
         </div>
-        {others.length > 0 ? (
+        {isAdmin && others.length > 0 ? (
           <select className="stats-who" value={who} onChange={e => setWho(e.target.value)} title="Whose time to show">
             <option value="me">Me</option>
             <option value="all">Everyone</option>

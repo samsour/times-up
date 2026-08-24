@@ -19,6 +19,14 @@ export async function getTeamMembers(teamId) {
   return (team?.members || []).map((m) => m.user).filter(Boolean);
 }
 
+// Workspace roles: 1 = owner, 2 = admin, 3 = member, 4 = guest.
+// ClickUp only lets owners/admins query other users' time entries, so the
+// UI mirrors that; treat a missing role as not allowed.
+export function canViewOthersTime(members, userId) {
+  const me = (members || []).find((m) => String(m.id) === String(userId));
+  return me?.role === 1 || me?.role === 2;
+}
+
 export async function getSpaces(teamId) {
   const { spaces } = await api().request({
     path: `/team/${teamId}/space?archived=false`,
