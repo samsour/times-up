@@ -6,7 +6,8 @@ import History from './History.jsx'
 import Reports from './Reports.jsx'
 import Settings from './Settings.jsx'
 import IdlePrompt from './IdlePrompt.jsx'
-import { getCurrentTimer, startTimer, updateTimeEntry, advanceTaskStatus, updateTask } from '../lib/clickup.js'
+import Planning from './Planning.jsx'
+import { getCurrentTimer, startTimer, updateTimeEntry, advanceTaskStatus, updateTask, getTeamMembers, canViewOthersTime } from '../lib/clickup.js'
 import './Tracker.css'
 
 export default function Tracker({ teamId, userId, theme, onThemeChange, font, onFontChange, onReset }) {
@@ -17,11 +18,18 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   const [updateReady, setUpdateReady] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [toast, setToast] = useState(null) // { text, undo }
+  const [isAdmin, setIsAdmin] = useState(false)
   const toastTimer = useRef(null)
 
-  const refreshCurrent = useCallback(async () => {
+  useEffect(() => {
+    getTeamMembers(teamId)
+      .then(ms => setIsAdmin(canViewOthersTime(ms, userId)))
+      .catch(() => {})
+  }, [teamId, userId])
+
+  const refreshCurrent = useCallback(async (force = false) => {
     try {
-      const entry = await getCurrentTimer(teamId)
+      const entry = await getCurrentTimer(teamId, force)
       setCurrentEntry(entry && entry.id ? entry : null)
     } catch {
       setCurrentEntry(null)
@@ -29,8 +37,8 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   }, [teamId])
 
   useEffect(() => {
-    refreshCurrent()
-    const interval = setInterval(refreshCurrent, 10000)
+    refreshCurrent(true)
+    const interval = setInterval(() => refreshCurrent(), 10000)
     return () => clearInterval(interval)
   }, [refreshCurrent])
 
@@ -48,7 +56,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
 
   function bumpRefresh() {
     setRefreshKey(k => k + 1)
-    refreshCurrent()
+    refreshCurrent(true)
   }
 
   function showToast(next) {
@@ -100,6 +108,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
         <div className="tracker-tabs">
           <TabBtn active={view === 'today'} onClick={() => setView('today')}>Today</TabBtn>
           <TabBtn active={view === 'stats'} onClick={() => setView('stats')}>Stats</TabBtn>
+          {isAdmin && <TabBtn active={view === 'plan'} onClick={() => setView('plan')}>Plan</TabBtn>}
         </div>
         <button
           className={`tracker-settings ${view === 'settings' ? 'tracker-settings-active' : ''}`}
@@ -134,6 +143,9 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
         )}
         {view === 'stats' && (
           <StatsView teamId={teamId} userId={userId} refreshKey={refreshKey} onChange={bumpRefresh} />
+        )}
+        {view === 'plan' && isAdmin && (
+          <Planning teamId={teamId} userId={userId} />
         )}
         {view === 'settings' && (
           <Settings

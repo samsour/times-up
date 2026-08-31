@@ -7,7 +7,8 @@ contextBridge.exposeInMainWorld('api', {
     delete: (key) => ipcRenderer.invoke('store:delete', key)
   },
   clickup: {
-    request: (opts) => ipcRenderer.invoke('clickup:request', opts)
+    request: (opts) => ipcRenderer.invoke('clickup:request', opts),
+    currentTimer: (force) => ipcRenderer.invoke('clickup:currentTimer', { force })
   },
   window: {
     hide: () => ipcRenderer.invoke('window:hide')

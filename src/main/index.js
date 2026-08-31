@@ -146,23 +146,31 @@ function toggleWindow() {
 }
 
 let activeTimer = null // { start: number, label: string }
+let currentEntry = null // full API entry, served to the renderer's poll
+let timerSync = null // in-flight sync, so forced refreshes coalesce
 
 async function syncTimer() {
   const token = store.get('clickup_token')
   const teamId = store.get('team_id')
-  if (!token || !teamId) { activeTimer = null; updateTrayTitle(); return }
+  if (!token || !teamId) { activeTimer = null; currentEntry = null; updateTrayTitle(); return }
   try {
     const res = await fetch(`https://api.clickup.com/api/v2/team/${teamId}/time_entries/current`, {
       headers: { Authorization: token }
     })
+    // Keep the last known state on errors (e.g. 429) instead of flickering
+    if (!res.ok) { updateTrayTitle(); return }
     const { data } = await res.json()
+    currentEntry = data || null
     activeTimer = data
       ? { start: parseInt(data.start), label: (data.task?.name || data.description || '').slice(0, 30) }
       : null
-  } catch {
-    activeTimer = null
-  }
+  } catch {}
   updateTrayTitle()
+}
+
+function syncTimerOnce() {
+  if (!timerSync) timerSync = syncTimer().finally(() => { timerSync = null })
+  return timerSync
 }
 
 function updateTrayTitle() {
@@ -190,9 +198,9 @@ function createTray() {
   tray.setToolTip('TimesUp')
   tray.on('click', toggleWindow)
 
-  syncTimer()
+  syncTimerOnce()
   setInterval(updateTrayTitle, 10_000)
-  setInterval(syncTimer, 10_000)
+  setInterval(syncTimerOnce, 10_000)
 
   // Right-click menu for quitting
   tray.on('right-click', () => {
@@ -229,18 +237,36 @@ ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
   const token = store.get('clickup_token')
   if (!token) throw new Error('No API token set')
 
-  const res = await fetch(`https://api.clickup.com/api/v2${path}`, {
-    method,
-    headers: {
-      'Authorization': token,
-      'Content-Type': 'application/json'
-    },
-    body: body ? JSON.stringify(body) : undefined
-  })
+  // Rate-limit bursts degrade into a short wait instead of an error:
+  // retry 429s up to 3 times, honoring Retry-After when ClickUp sends it
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`https://api.clickup.com/api/v2${path}`, {
+      method,
+      headers: {
+        'Authorization': token,
+        'Content-Type': 'application/json'
+      },
+      body: body ? JSON.stringify(body) : undefined
+    })
 
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.err || `HTTP ${res.status}`)
-  return data
+    if (res.status === 429 && attempt < 3) {
+      const after = parseFloat(res.headers.get('retry-after'))
+      const waitMs = Math.min((after > 0 ? after : 2 ** attempt) * 1000, 30_000)
+      await new Promise(resolve => setTimeout(resolve, waitMs))
+      continue
+    }
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.err || `HTTP ${res.status}`)
+    return data
+  }
+})
+
+// The renderer reads the tray poll's cached timer instead of polling the
+// API itself; force asks for a fresh fetch right now (after start/stop).
+ipcMain.handle('clickup:currentTimer', async (_, opts) => {
+  if (opts?.force) await syncTimerOnce()
+  return currentEntry
 })
 
 ipcMain.handle('window:hide', () => win.hide())

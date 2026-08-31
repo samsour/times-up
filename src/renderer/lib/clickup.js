@@ -27,6 +27,13 @@ export function canViewOthersTime(members, userId) {
   return me?.role === 1 || me?.role === 2;
 }
 
+// Guests are clients or read-only outsiders, not part of the team's
+// capacity — keep them out of planning. Only known guests are dropped so
+// a missing role field doesn't empty the roster.
+export function schedulableMembers(members) {
+  return (members || []).filter((m) => m.role !== 4);
+}
+
 export async function getSpaces(teamId) {
   const { spaces } = await api().request({
     path: `/team/${teamId}/space?archived=false`,
@@ -66,14 +73,31 @@ export async function getTasks(listId) {
   return tasks;
 }
 
-export async function createTask(listId, name) {
+export async function createTask(listId, name, extra = {}) {
   const task = await api().request({
     method: "POST",
     path: `/list/${listId}/task`,
-    body: { name },
+    body: { name, ...extra },
   });
   invalidateTaskCache();
   return task;
+}
+
+export async function deleteTask(taskId) {
+  const res = await api().request({
+    method: "DELETE",
+    path: `/task/${taskId}`,
+  });
+  invalidateTaskCache();
+  return res;
+}
+
+export async function createList(spaceId, name) {
+  return api().request({
+    method: "POST",
+    path: `/space/${spaceId}/list`,
+    body: { name },
+  });
 }
 
 export async function updateTask(taskId, body) {
@@ -168,12 +192,11 @@ export async function stopTimer(teamId) {
   });
 }
 
-export async function getCurrentTimer(teamId) {
+// Served from the main process's tray poll instead of a second API poll;
+// pass force=true right after starting/stopping to fetch fresh state.
+export async function getCurrentTimer(teamId, force = false) {
   try {
-    const { data } = await api().request({
-      path: `/team/${teamId}/time_entries/current`,
-    });
-    return data;
+    return await window.api.clickup.currentTimer(force);
   } catch {
     return null;
   }
