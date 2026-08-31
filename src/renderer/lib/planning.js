@@ -4,6 +4,9 @@
 // Allocation tasks carry real assignees, dates and time estimates, which
 // keeps ClickUp's own Workload view accurate as a side effect.
 import { getTasks, createTask, updateTask, deleteTask } from "./clickup.js";
+import { countWorkdays } from "./time.js";
+
+export { countWorkdays };
 
 const MARK = "[timesup-plan:v1]";
 
@@ -97,22 +100,3 @@ export async function saveCapacity(planListId, existingTaskId, hpdByUser) {
   return createTask(planListId, "Capacity · hours per day", { description });
 }
 
-// Mon–Fri days in [start, end] (dates inclusive), optionally clipped to
-// [clipStart, clipEnd]. Noon anchoring dodges DST off-by-ones.
-export function countWorkdays(start, end, clipStart = start, clipEnd = end) {
-  const a = Math.max(start, clipStart);
-  const b = Math.min(end, clipEnd);
-  if (a > b) return 0;
-  let count = 0;
-  const d = new Date(a);
-  d.setHours(12, 0, 0, 0);
-  const last = new Date(b);
-  last.setHours(12, 0, 0, 0);
-  let guard = 0;
-  while (d <= last && guard++ < 1100) {
-    const day = d.getDay();
-    if (day >= 1 && day <= 5) count++;
-    d.setDate(d.getDate() + 1);
-  }
-  return count;
-}

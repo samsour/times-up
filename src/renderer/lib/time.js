@@ -69,6 +69,26 @@ export function startOfWeek(date = new Date()) {
   return d.getTime()
 }
 
+// Working days in [start, end] (dates inclusive), optionally clipped to
+// [clipStart, clipEnd]. workdays holds getDay() numbers, Mon–Fri by
+// default. Noon anchoring dodges DST off-by-ones.
+export function countWorkdays(start, end, clipStart = start, clipEnd = end, workdays = [1, 2, 3, 4, 5]) {
+  const a = Math.max(start, clipStart)
+  const b = Math.min(end, clipEnd)
+  if (a > b) return 0
+  let count = 0
+  const d = new Date(a)
+  d.setHours(12, 0, 0, 0)
+  const last = new Date(b)
+  last.setHours(12, 0, 0, 0)
+  let guard = 0
+  while (d <= last && guard++ < 1100) {
+    if (workdays.includes(d.getDay())) count++
+    d.setDate(d.getDate() + 1)
+  }
+  return count
+}
+
 export function startOfMonth(date = new Date()) {
   const d = new Date(date)
   d.setDate(1)

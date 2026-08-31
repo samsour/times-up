@@ -9,6 +9,7 @@ import {
   createTask,
 } from '../lib/clickup.js'
 import { formatDuration, formatDurationShort, startOfDay, endOfDay } from '../lib/time.js'
+import { getGoals } from '../lib/goals.js'
 import './TimerBar.css'
 
 // Compact always-visible timer strip: start/stop, elapsed, task switch,
@@ -46,7 +47,7 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
   }, [isRunning, currentEntry])
 
   useEffect(() => {
-    window.api.store.get('daily_goal_hours').then(h => setCapacity((h || 0) * 3600000))
+    getGoals().then(g => setCapacity(g.dailyMs))
     window.api.store.get('last_list').then(l => l && setLastList(l))
   }, [])
 

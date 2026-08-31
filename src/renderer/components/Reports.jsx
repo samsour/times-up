@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getTimeEntries, getTeamMembers, getListColors, canViewOthersTime } from '../lib/clickup.js'
-import { formatDurationShort, startOfDay, endOfDay, startOfWeek, startOfMonth } from '../lib/time.js'
+import { formatDurationShort, startOfDay, endOfDay, startOfWeek, startOfMonth, countWorkdays } from '../lib/time.js'
+import { getGoals } from '../lib/goals.js'
 import './Reports.css'
 
 const MAX_TASK_ROWS = 7
@@ -14,6 +15,14 @@ export default function Reports({ teamId, userId }) {
   const [error, setError] = useState('')
   const [goalMs, setGoalMs] = useState(0)
   const [listColors, setListColors] = useState({})
+  const [workdays, setWorkdays] = useState([1, 2, 3, 4, 5]) // getDay() numbers
+
+  useEffect(() => {
+    getGoals().then(g => {
+      setWorkdays(g.workdays)
+      setGoalMs(g.dailyMs)
+    })
+  }, [])
 
   useEffect(() => {
     getListColors(teamId).then(setListColors).catch(() => {})
@@ -21,7 +30,6 @@ export default function Reports({ teamId, userId }) {
 
   useEffect(() => {
     window.api.store.get('stats_range').then(r => { if (r) setRange(r) })
-    window.api.store.get('daily_goal_hours').then(h => setGoalMs((h || 0) * 3600000))
     getTeamMembers(teamId).then(setMembers).catch(() => {})
   }, [teamId])
 
@@ -83,8 +91,19 @@ export default function Reports({ teamId, userId }) {
   }
 
   const activeDays = days ? days.filter(d => perDay[d] > 0).length : Object.keys(perDay).length
-  const avgPerDay = activeDays ? total / activeDays : 0
   const earliest = entries.reduce((min, e) => Math.min(min, parseInt(e.start)), Infinity)
+
+  // Avg over the user's elapsed scheduled workdays, so skipped scheduled
+  // days pull it down. Today only joins once it's over (its hours are
+  // excluded until then), and time tracked on off-days counts into the
+  // total without adding divisor days — extra work can only raise the avg.
+  // Other people's schedules aren't known, so they get Mon–Fri.
+  const schedule = who === 'me' ? workdays : [1, 2, 3, 4, 5]
+  const todayKey = startOfDay()
+  const rangeStart = days ? days[0] : isFinite(earliest) ? earliest : null
+  const elapsedWorkdays =
+    rangeStart != null ? countWorkdays(rangeStart, todayKey - 1, rangeStart, todayKey - 1, schedule) : 0
+  const avgPerDay = elapsedWorkdays > 0 ? (total - (perDay[todayKey] || 0)) / elapsedWorkdays : null
 
   const ranked = Object.values(perTask)
     .sort((a, b) => b.ms - a.ms)
@@ -133,7 +152,7 @@ export default function Reports({ teamId, userId }) {
           <>
             <div className="stats-tiles">
               <StatTile label="Total" value={formatDurationShort(total)} />
-              <StatTile label="Avg / day" value={formatDurationShort(avgPerDay)} />
+              <StatTile label="Avg / workday" value={avgPerDay == null ? '—' : formatDurationShort(avgPerDay)} />
               <StatTile label="Days" value={days ? `${activeDays}/${days.length}` : `${activeDays}`} />
               {!days && (
                 <StatTile

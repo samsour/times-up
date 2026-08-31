@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getTimeEntries, getUser } from '../lib/clickup.js'
+import { getGoals } from '../lib/goals.js'
 import './Settings.css'
 
 function pad(n) { return String(n).padStart(2, '0') }
@@ -44,7 +45,8 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [idleDetection, setIdleDetection] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
-  const [dailyGoalHours, setDailyGoalHours] = useState('')
+  const [weeklyGoalHours, setWeeklyGoalHours] = useState('')
+  const [workdays, setWorkdays] = useState([1, 2, 3, 4, 5]) // getDay() numbers
   const [autoProgress, setAutoProgress] = useState(true)
   const [updateState, setUpdateState] = useState('idle')
   const [exportPreset, setExportPreset] = useState('week') // 'week' | 'month' | 'custom'
@@ -57,7 +59,10 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
     window.api.store.get('idleDetection').then(v => setIdleDetection(!!v))
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
-    window.api.store.get('daily_goal_hours').then(v => setDailyGoalHours(v || ''))
+    getGoals().then(g => {
+      setWeeklyGoalHours(g.weeklyH || '')
+      setWorkdays(g.workdays)
+    })
     window.api.store.get('auto_progress').then(v => setAutoProgress(v !== false))
     window.api.updater.getState().then(setUpdateState)
     return window.api.updater.onStateChange(setUpdateState)
@@ -108,6 +113,14 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       downloadCSV(entriesToCSV(completed, user), `timesup-${label}.csv`)
     } catch {}
     setExporting(false)
+  }
+
+  async function toggleWorkday(d) {
+    const has = workdays.includes(d)
+    if (has && workdays.length === 1) return // keep at least one working day
+    const next = has ? workdays.filter(x => x !== d) : [...workdays, d]
+    setWorkdays(next)
+    await window.api.store.set('workdays', next)
   }
 
   async function handleAutoLaunch(val) {
@@ -205,27 +218,54 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       <div className="settings-section">
         <div className="settings-label">Tracking</div>
         <div className="settings-row">
-          <span className="settings-row-title">Daily goal</span>
+          <span className="settings-row-title">
+            Weekly goal
+            {weeklyGoalHours > 0 && workdays.length > 0 && (
+              <span className="settings-goal-hint">
+                ≈ {Math.round((weeklyGoalHours / workdays.length) * 10) / 10}h / day
+              </span>
+            )}
+          </span>
           <div className="settings-number-row">
             <input
               className="settings-number"
               type="number"
               min="1"
-              max="24"
+              max="100"
               placeholder="—"
-              value={dailyGoalHours}
+              value={weeklyGoalHours}
               onChange={async e => {
                 const raw = e.target.value
-                setDailyGoalHours(raw)
+                setWeeklyGoalHours(raw)
                 const h = parseFloat(raw)
+                // Single source of truth: the legacy daily key is dropped
+                // so it can't shadow the weekly value after clearing it
+                await window.api.store.delete('daily_goal_hours')
                 if (raw === '' || isNaN(h)) {
-                  await window.api.store.delete('daily_goal_hours')
+                  await window.api.store.delete('weekly_goal_hours')
                 } else {
-                  await window.api.store.set('daily_goal_hours', Math.min(24, Math.max(0.5, h)))
+                  await window.api.store.set('weekly_goal_hours', Math.min(100, Math.max(1, h)))
                 }
               }}
             />
-            <span className="settings-number-unit">h / day</span>
+            <span className="settings-number-unit">h / week</span>
+          </div>
+        </div>
+        <div className="settings-row">
+          <span className="settings-row-title" title="Days you normally work — your average divides by these; time tracked on other days only adds on top">
+            Working days
+          </span>
+          <div className="workday-chips">
+            {[
+              { d: 1, label: 'M' }, { d: 2, label: 'T' }, { d: 3, label: 'W' },
+              { d: 4, label: 'T' }, { d: 5, label: 'F' }, { d: 6, label: 'S' }, { d: 0, label: 'S' },
+            ].map(({ d, label }) => (
+              <button
+                key={d}
+                className={`workday-chip ${workdays.includes(d) ? 'workday-chip-active' : ''}`}
+                onClick={() => toggleWorkday(d)}
+              >{label}</button>
+            ))}
           </div>
         </div>
       </div>
