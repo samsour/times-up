@@ -12,11 +12,7 @@ jobs:
   build:
     strategy:
       matrix:
-        include:
-          - os: macos-latest
-            build_cmd: pnpm run build:mac
-          - os: windows-latest
-            build_cmd: pnpm run build:win
+        os: [macos-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -34,7 +30,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build & publish
-        run: ${{ matrix.build_cmd }}
+      - name: Build & publish (mac, signed + notarized)
+        if: matrix.os == 'macos-latest'
+        run: pnpm run build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build & publish (win)
+        if: matrix.os == 'windows-latest'
+        run: pnpm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

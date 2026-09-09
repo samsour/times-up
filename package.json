@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "vite build && electron-builder",
     "build:mac": "vite build && electron-builder --mac --publish always",
+    "pack:mac": "vite build && electron-builder --mac --publish never",
     "build:win": "vite build && electron-builder --win --publish always",
     "preview": "vite preview",
     "release": "git tag v$(node -p \"require('./package.json').version\") && git push origin --tags && git push github main --tags"
@@ -52,7 +53,12 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true
     },
     "win": {
       "target": [
