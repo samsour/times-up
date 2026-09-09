@@ -190,6 +190,7 @@ export default function Today({ teamId, currentEntry, refreshKey, onChange, onTa
               onTaskTracked={onTaskTracked}
               currentEntry={currentEntry}
               onDragCard={setDragCard}
+              dragCard={dragCard}
               color={card.listId ? listColors[card.listId] : null}
             />
           ))}
@@ -217,13 +218,35 @@ export default function Today({ teamId, currentEntry, refreshKey, onChange, onTa
   )
 }
 
-function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, onTaskTracked, currentEntry, onDragCard, color }) {
+function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, onTaskTracked, currentEntry, onDragCard, dragCard, color }) {
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState(null) // null | 'assign' | 'create'
+  const [dropOver, setDropOver] = useState(false)
 
   const name = card.task?.name || card.description || 'Untitled'
   const isUnassigned = !card.task
   const status = card.task?.status
+
+  // Dropping an unassigned card onto this task card moves its entries here
+  const canReceiveDrop =
+    !!dragCard && !dragCard.task && dragCard.key !== card.key && !!card.task?.id
+
+  async function receiveDrop() {
+    setDropOver(false)
+    if (!canReceiveDrop || busy) return
+    setBusy(true)
+    try {
+      for (const e of dragCard.entries) {
+        await updateTimeEntry(teamId, e.id, { tid: card.task.id })
+      }
+      await onChange()
+      onTaskTracked?.(card.task.id)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function handlePlay() {
     setBusy(true)
@@ -274,6 +297,7 @@ function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, on
         'entry-card',
         isRunning ? 'entry-card-running' : '',
         highlighted ? 'entry-card-hl' : '',
+        dropOver ? 'entry-card-drop' : '',
       ].filter(Boolean).join(' ')}
       style={color && !isRunning ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}
       onMouseEnter={() => onHover(card.key)}
@@ -285,6 +309,14 @@ function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, on
         onDragCard(card)
       }}
       onDragEnd={() => onDragCard(null)}
+      onDragOver={e => {
+        if (!canReceiveDrop) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+        setDropOver(true)
+      }}
+      onDragLeave={() => setDropOver(false)}
+      onDrop={e => { e.preventDefault(); receiveDrop() }}
     >
       <div className="entry-card-top">
         <div className="entry-card-info">

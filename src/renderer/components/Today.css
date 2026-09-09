@@ -133,6 +133,12 @@
   color: var(--text-muted);
 }
 
+.entry-card.entry-card-drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-dim);
+}
+
 .entry-card {
   cursor: grab;
   padding: 11px 12px;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createTimeEntry, updateTimeEntry, deleteTimeEntry, searchTasks } from '../lib/clickup.js'
+import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { formatDurationShort, formatTime, startOfDay } from '../lib/time.js'
 import './Timetable.css'
 
@@ -38,6 +39,9 @@ export default function Timetable({
   const [dragRange, setDragRange] = useState(null)
   const [draft, setDraft] = useState(null)
   const [draftDesc, setDraftDesc] = useState('')
+  const [draftTask, setDraftTask] = useState(null) // picked { id, name }
+  const [draftTaskQuery, setDraftTaskQuery] = useState('')
+  const [draftTaskFocus, setDraftTaskFocus] = useState(false)
   const [saving, setSaving] = useState(false)
   const [draggingBlock, setDraggingBlock] = useState(null)
   const [editing, setEditing] = useState(null) // { entry }
@@ -83,11 +87,20 @@ export default function Timetable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, day])
 
+  const { tasks: draftSuggestions } = useTaskSuggestions(teamId, undefined, draftTaskQuery, { limit: 5 })
+
+  function resetDraft() {
+    setDraft(null)
+    setDraftDesc('')
+    setDraftTask(null)
+    setDraftTaskQuery('')
+  }
+
   // Close popups when switching days
   useEffect(() => {
     setEditing(null)
-    setDraft(null)
-    setDraftDesc('')
+    resetDraft()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day])
 
   function getTimeFromEvent(e) {
@@ -104,8 +117,7 @@ export default function Timetable({
     const snappedStart = snap(start)
     let snappedEnd = snap(start + Math.max(parseInt(entry.duration || 0), 0))
     if (snappedEnd <= snappedStart) snappedEnd = snappedStart + SNAP_MS
-    setDraft(null)
-    setDraftDesc('')
+    resetDraft()
     setEditing({ entry })
     setEditStart(snappedStart)
     setEditEnd(Math.min(snappedEnd, day + DAY_MS))
@@ -167,7 +179,7 @@ export default function Timetable({
     if (e.button !== 0) return
     if (e.target.closest('.timetable-block') || e.target.closest('.timetable-draft-form')) return
     if (editing) { setEditing(null); return }
-    if (draft) { setDraft(null); setDraftDesc(''); return }
+    if (draft) { resetDraft(); return }
     e.preventDefault()
 
     const anchor = getTimeFromEvent(e)
@@ -184,7 +196,12 @@ export default function Timetable({
       const start = Math.min(anchor, current)
       const end = Math.max(anchor, current)
       setDragRange(null)
-      if (end - start >= SNAP_MS) { setDraft({ start, end }); setDraftDesc('') }
+      if (end - start >= SNAP_MS) {
+        setDraft({ start, end })
+        setDraftDesc('')
+        setDraftTask(null)
+        setDraftTaskQuery('')
+      }
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
@@ -268,12 +285,12 @@ export default function Timetable({
     setSaving(true)
     try {
       await createTimeEntry(teamId, {
+        taskId: draftTask?.id,
         start: draft.start,
         duration: draft.end - draft.start,
         description: draftDesc.trim(),
       })
-      setDraft(null)
-      setDraftDesc('')
+      resetDraft()
       await onChange?.()
     } catch (err) {
       alert(err.message)
@@ -282,7 +299,7 @@ export default function Timetable({
     }
   }
 
-  function cancelDraft() { setDraft(null); setDraftDesc('') }
+  function cancelDraft() { resetDraft() }
 
   // ── drop a card from the rail: creates a 1h entry at the drop position ───
   const DROP_DUR = HOUR_MS
@@ -576,6 +593,37 @@ export default function Timetable({
                   if (e.key === 'Escape') cancelDraft()
                 }}
               />
+              {draftTask ? (
+                <button className="draft-task-chip" title="Remove task" onClick={() => setDraftTask(null)}>
+                  <span className="draft-task-chip-name">{draftTask.name}</span>
+                  <span className="draft-task-chip-x">×</span>
+                </button>
+              ) : (
+                <input
+                  className="draft-input"
+                  placeholder="Link a task (optional)…"
+                  value={draftTaskQuery}
+                  onChange={e => setDraftTaskQuery(e.target.value)}
+                  onFocus={() => setDraftTaskFocus(true)}
+                  onBlur={() => setDraftTaskFocus(false)}
+                  onKeyDown={e => { if (e.key === 'Escape') cancelDraft() }}
+                />
+              )}
+              {!draftTask && draftTaskFocus && draftSuggestions.length > 0 && (
+                <div className="edit-task-results">
+                  {draftSuggestions.map(t => (
+                    <button
+                      key={t.id}
+                      className="edit-task-result"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => { setDraftTask({ id: t.id, name: t.name }); setDraftTaskQuery('') }}
+                    >
+                      <span className="edit-task-result-name">{t.name}</span>
+                      {t.list && <span className="edit-task-result-meta">{t.list}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="draft-actions">
                 <button className="draft-cancel" onClick={cancelDraft}>Cancel</button>
                 <button className="draft-save" onClick={saveDraft} disabled={saving}>

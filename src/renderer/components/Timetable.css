@@ -383,6 +383,35 @@
   font-variant-numeric: tabular-nums;
 }
 
+.draft-task-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--accent-dim);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+
+.draft-task-chip-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.draft-task-chip-x {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.draft-task-chip:hover .draft-task-chip-x {
+  color: var(--danger);
+}
+
 .edit-task-results {
   display: flex;
   flex-direction: column;
