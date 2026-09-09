@@ -4,12 +4,11 @@ import {
   stopTimer,
   updateTimeEntry,
   getTimeEntries,
-  getMyTasks,
-  searchTasks,
   createTask,
 } from '../lib/clickup.js'
 import { formatDuration, formatDurationShort, startOfDay, endOfDay } from '../lib/time.js'
 import { getGoals } from '../lib/goals.js'
+import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './TimerBar.css'
 
 // Compact always-visible timer strip: start/stop, elapsed, task switch,
@@ -20,10 +19,6 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
-  const [recents, setRecents] = useState([])
-  const [myTasks, setMyTasks] = useState([])
-  const [searchResults, setSearchResults] = useState(null)
-  const [searchLoading, setSearchLoading] = useState(false)
   const [lastList, setLastList] = useState(null)
   const [editingStart, setEditingStart] = useState(false)
   const [startEdit, setStartEdit] = useState('')
@@ -31,11 +26,15 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
   const [noteDraft, setNoteDraft] = useState('')
   const [capacity, setCapacity] = useState(0)
   const [completedToday, setCompletedToday] = useState(0)
-  const debounceRef = useRef(null)
   const inputRef = useRef(null)
 
   const isRunning = !!currentEntry
   const runningTask = currentEntry?.task || null
+
+  const { tasks: taskItems, settled: searchSettled } = useTaskSuggestions(teamId, userId, query, {
+    excludeId: runningTask?.id ?? null,
+    refreshKey: currentEntry?.id ?? null,
+  })
 
   useEffect(() => {
     if (!isRunning) { setElapsed(0); return }
@@ -68,62 +67,6 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
     setSwitching(false)
     setEditingStart(false)
   }, [currentEntry?.id])
-
-  const normalizeTask = (t, recent = false) => ({
-    id: t.id,
-    name: t.name,
-    list: t.list?.name,
-    status: t.status?.status,
-    statusColor: t.status?.color,
-    recent,
-  })
-
-  // Recently tracked tasks + my in-progress tasks
-  useEffect(() => {
-    const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000
-    getTimeEntries(teamId, fourteenDaysAgo, endOfDay())
-      .then(data => {
-        const sorted = (data || []).sort((a, b) => parseInt(b.start) - parseInt(a.start))
-        const seen = new Set()
-        const tasks = []
-        for (const e of sorted) {
-          if (e.task?.id && !seen.has(e.task.id)) {
-            seen.add(e.task.id)
-            tasks.push(normalizeTask(e.task, true))
-          }
-        }
-        setRecents(tasks)
-      })
-      .catch(() => {})
-    if (userId) {
-      getMyTasks(teamId, userId)
-        .then(tasks => setMyTasks(tasks.map(t => normalizeTask(t))))
-        .catch(() => {})
-    }
-  }, [teamId, userId, currentEntry?.id])
-
-  // Debounced server search
-  useEffect(() => {
-    clearTimeout(debounceRef.current)
-    const q = query.trim()
-    if (!q) {
-      setSearchResults(null)
-      setSearchLoading(false)
-      return
-    }
-    setSearchLoading(true)
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const tasks = await searchTasks(teamId, q)
-        setSearchResults(tasks.map(t => normalizeTask(t)))
-      } catch {
-        setSearchResults([])
-      } finally {
-        setSearchLoading(false)
-      }
-    }, 300)
-    return () => clearTimeout(debounceRef.current)
-  }, [query, teamId])
 
   async function handleStop() {
     setBusy(true)
@@ -225,25 +168,7 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
     }
   }
 
-  // Suggestion list: recents, then my in-progress tasks, then server results
   const q = query.trim().toLowerCase()
-  const currentTaskId = runningTask?.id
-  let taskItems
-  if (!q) {
-    const seen = new Set()
-    taskItems = [...recents, ...myTasks]
-      .filter(t => t.id !== currentTaskId && !seen.has(t.id) && seen.add(t.id))
-      .slice(0, 7)
-  } else {
-    const matches = t => t.name.toLowerCase().includes(q)
-    const recentMatches = recents.filter(matches)
-    const seen = new Set(recentMatches.map(t => t.id))
-    const rest = [...myTasks.filter(matches), ...(searchResults || [])].filter(
-      t => !seen.has(t.id) && seen.add(t.id)
-    )
-    taskItems = [...recentMatches, ...rest].filter(t => t.id !== currentTaskId).slice(0, 8)
-  }
-  const searchSettled = !q || (!searchLoading && searchResults !== null)
   const showStartNote = !isRunning && q.length > 0
   const showCreate = q && searchSettled && taskItems.length === 0 && lastList
   // Row order mirrors the render: optional note row, tasks, optional create row
@@ -303,7 +228,7 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
               <input
                 ref={inputRef}
                 className="timer-bar-input"
-                placeholder={isRunning ? 'Switch task…' : 'Start a task or note…'}
+                placeholder={isRunning ? (runningTask ? 'Switch task…' : 'Assign a task…') : 'Start a task or note…'}
                 value={query}
                 onChange={e => { setQuery(e.target.value); setHighlight(0) }}
                 onFocus={() => setOpen(true)}
@@ -378,15 +303,25 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
               </svg>
             </button>
           ) : (
-            <input
-              className="timer-bar-input timer-bar-note"
-              placeholder="What are you working on?"
-              value={noteDraft}
-              onChange={e => setNoteDraft(e.target.value)}
-              onBlur={saveNote}
-              onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
-              maxLength={200}
-            />
+            // Running without a task: note input plus a way to attach one
+            <div className="timer-bar-unassigned">
+              <input
+                className="timer-bar-input timer-bar-note"
+                placeholder="What are you working on?"
+                value={noteDraft}
+                onChange={e => setNoteDraft(e.target.value)}
+                onBlur={saveNote}
+                onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+                maxLength={200}
+              />
+              <button
+                className="timer-bar-assign"
+                onClick={() => setSwitching(true)}
+                title="Assign this entry to a task"
+              >
+                + task
+              </button>
+            </div>
           )}
         </div>
 

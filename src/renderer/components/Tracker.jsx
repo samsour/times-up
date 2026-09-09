@@ -162,6 +162,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
           <div className="tracker-overlay">
             <TaskPicker
               teamId={teamId}
+              userId={userId}
               onPick={handleBrowsePick}
               onCancel={() => setPickerOpen(false)}
             />

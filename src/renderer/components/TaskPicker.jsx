@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
-import { getSpaces, getFolders, getFolderlessLists, getListsInFolder, getTasks, searchTasks } from '../lib/clickup.js'
+import { useState, useEffect } from 'react'
+import { getSpaces, getFolders, getFolderlessLists, getListsInFolder, getTasks } from '../lib/clickup.js'
+import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './TaskPicker.css'
 
-export default function TaskPicker({ teamId, onPick, onCancel }) {
+export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
   const [crumbs, setCrumbs] = useState([{ type: 'team', name: 'Spaces' }])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
-  const [searchResults, setSearchResults] = useState(null) // null = not searching
-  const [searching, setSearching] = useState(false)
   const [error, setError] = useState('')
-  const debounceRef = useRef(null)
+
+  const { tasks: searchResults, settled } = useTaskSuggestions(teamId, userId, search, { limit: 12 })
 
   const current = crumbs[crumbs.length - 1]
 
@@ -18,24 +18,6 @@ export default function TaskPicker({ teamId, onPick, onCancel }) {
     loadCurrent()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crumbs])
-
-  // Debounced API search
-  useEffect(() => {
-    clearTimeout(debounceRef.current)
-    if (!search.trim()) { setSearchResults(null); return }
-    setSearching(true)
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const tasks = await searchTasks(teamId, search.trim())
-        setSearchResults(tasks)
-      } catch {
-        setSearchResults([])
-      } finally {
-        setSearching(false)
-      }
-    }, 350)
-    return () => clearTimeout(debounceRef.current)
-  }, [search, teamId])
 
   async function loadCurrent() {
     setLoading(true)
@@ -148,12 +130,15 @@ export default function TaskPicker({ teamId, onPick, onCancel }) {
           </button>
         ))}
 
-        {/* Search results mode */}
-        {isSearching && searching && <div className="picker-loading">Searching…</div>}
-        {isSearching && !searching && searchResults?.length === 0 && (
+        {/* Search results mode: local matches render instantly and stay
+            visible while the server search tops the list up */}
+        {isSearching && !settled && searchResults.length === 0 && (
+          <div className="picker-loading">Searching…</div>
+        )}
+        {isSearching && settled && searchResults.length === 0 && (
           <div className="picker-empty">No tasks found.</div>
         )}
-        {isSearching && !searching && searchResults?.map(task => (
+        {isSearching && searchResults.map(task => (
           <button
             key={task.id}
             className="picker-item"
@@ -162,13 +147,11 @@ export default function TaskPicker({ teamId, onPick, onCancel }) {
             <span className="picker-icon picker-icon-task">{iconFor('task')}</span>
             <span className="picker-item-info">
               <span className="picker-item-name">{task.name}</span>
-              {task.list?.name && (
-                <span className="picker-item-context">{task.space?.name} / {task.list.name}</span>
-              )}
+              {task.list && <span className="picker-item-context">{task.list}</span>}
             </span>
-            {task.status?.status && (
-              <span className="picker-status" style={{ color: task.status.color || 'var(--text-muted)' }}>
-                {task.status.status}
+            {task.status && (
+              <span className="picker-status" style={{ color: task.statusColor || 'var(--text-muted)' }}>
+                {task.status}
               </span>
             )}
           </button>

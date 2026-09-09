@@ -6,11 +6,11 @@ import {
   startTimer,
   stopTimer,
   createTask,
-  searchTasks,
   getAllLists,
   getListColors,
 } from '../lib/clickup.js'
 import { formatDurationShort, formatTime, startOfDay, endOfDay } from '../lib/time.js'
+import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './Today.css'
 
 // One card per task (aggregated), one card per unassigned entry
@@ -338,15 +338,26 @@ function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, on
             )
           })}
         {!isUnassigned && card.task?.id && (
-          <button
-            className="entry-card-open"
-            title="Open in ClickUp"
-            onClick={() => window.api.shell.openExternal(`https://app.clickup.com/t/${card.task.id}`)}
-          >
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
-            </svg>
-          </button>
+          <>
+            <button
+              className="entry-card-open"
+              title="Open in ClickUp"
+              onClick={() => window.api.shell.openExternal(`https://app.clickup.com/t/${card.task.id}`)}
+            >
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+              </svg>
+            </button>
+            <button
+              className="entry-card-open"
+              title="Change task"
+              onClick={() => setMode(mode === 'assign' ? null : 'assign')}
+            >
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+          </>
         )}
       </div>
 
@@ -360,7 +371,13 @@ function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, on
       )}
 
       {mode === 'assign' && (
-        <AssignForm teamId={teamId} onPick={attachTask} onCancel={() => setMode(null)} busy={busy} />
+        <AssignForm
+          teamId={teamId}
+          excludeId={card.task?.id ?? null}
+          onPick={attachTask}
+          onCancel={() => setMode(null)}
+          busy={busy}
+        />
       )}
       {mode === 'create' && (
         <CreateTaskForm
@@ -390,24 +407,11 @@ function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, on
   )
 }
 
-function AssignForm({ teamId, onPick, onCancel, busy }) {
+function AssignForm({ teamId, excludeId = null, onPick, onCancel, busy }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState(null)
-  const debounceRef = useRef(null)
-
-  useEffect(() => {
-    clearTimeout(debounceRef.current)
-    const q = query.trim()
-    if (q.length < 2) { setResults(null); return }
-    debounceRef.current = setTimeout(async () => {
-      try {
-        setResults(await searchTasks(teamId, q))
-      } catch {
-        setResults([])
-      }
-    }, 300)
-    return () => clearTimeout(debounceRef.current)
-  }, [query, teamId])
+  // Recents show before typing; local matches stay visible while the
+  // server search runs, same behavior as the timer bar dropdown
+  const { tasks, settled } = useTaskSuggestions(teamId, undefined, query, { limit: 6, excludeId })
 
   return (
     <div className="entry-card-form">
@@ -419,17 +423,16 @@ function AssignForm({ teamId, onPick, onCancel, busy }) {
         onChange={e => setQuery(e.target.value)}
         onKeyDown={e => { if (e.key === 'Escape') onCancel() }}
       />
-      {results && (
-        <div className="edit-task-results">
-          {results.length === 0 && <div className="edit-task-empty">No tasks found.</div>}
-          {results.slice(0, 6).map(t => (
-            <button key={t.id} className="edit-task-result" disabled={busy} onClick={() => onPick(t)}>
-              <span className="edit-task-result-name">{t.name}</span>
-              {t.list?.name && <span className="edit-task-result-meta">{t.list.name}</span>}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="edit-task-results">
+        {tasks.length === 0 && !settled && <div className="edit-task-empty">Searching…</div>}
+        {tasks.length === 0 && settled && query.trim() && <div className="edit-task-empty">No tasks found.</div>}
+        {tasks.map(t => (
+          <button key={t.id} className="edit-task-result" disabled={busy} onClick={() => onPick(t)}>
+            <span className="edit-task-result-name">{t.name}</span>
+            {t.list && <span className="edit-task-result-meta">{t.list}</span>}
+          </button>
+        ))}
+      </div>
       <div className="draft-actions">
         <button className="draft-cancel" onClick={onCancel}>Cancel</button>
       </div>
