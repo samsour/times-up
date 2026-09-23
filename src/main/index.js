@@ -243,13 +243,30 @@ ipcMain.handle('store:get', (_, key) => store.get(key))
 ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
 ipcMain.handle('store:delete', (_, key) => store.delete(key))
 
+// Workspace structure (spaces, folders, lists, members) changes rarely but
+// is walked by several views in both windows; one shared cache in main
+// turns those ~30-request walks into one per few minutes. Any write
+// clears it so a list created from the app shows up right away.
+const STRUCTURE_TTL = 5 * 60_000
+const STRUCTURE_RE = /^\/team(\/\d+\/space)?(\?|$)|^\/space\/\d+\/(folder|list)(\?|$)|^\/folder\/\d+\/list(\?|$)|^\/list\/\d+(\?|$)/
+const structureCache = new Map() // path -> { at, data }
+
 // IPC: ClickUp API proxy (avoids CORS, keeps token in main process)
 ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
   const token = store.get('clickup_token')
   if (!token) throw new Error('No API token set')
 
+  const cacheable = method === 'GET' && STRUCTURE_RE.test(path)
+  if (cacheable) {
+    const hit = structureCache.get(path)
+    if (hit && Date.now() - hit.at < STRUCTURE_TTL) return hit.data
+  } else if (method !== 'GET') {
+    structureCache.clear()
+  }
+
   // Rate-limit bursts degrade into a short wait instead of an error:
   // retry 429s up to 3 times, honoring Retry-After when ClickUp sends it
+  const t0 = Date.now()
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`https://api.clickup.com/api/v2${path}`, {
       method,
@@ -263,12 +280,15 @@ ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
     if (res.status === 429 && attempt < 3) {
       const after = parseFloat(res.headers.get('retry-after'))
       const waitMs = Math.min((after > 0 ? after : 2 ** attempt) * 1000, 30_000)
+      if (isDev) console.log(`[api] 429 ${method} ${path} retry in ${waitMs}ms`)
       await new Promise(resolve => setTimeout(resolve, waitMs))
       continue
     }
 
     const data = await res.json().catch(() => ({}))
+    if (isDev) console.log(`[api] ${res.status} ${method} ${path.split('?')[0]} ${Date.now() - t0}ms`)
     if (!res.ok) throw new Error(data.err || `HTTP ${res.status}`)
+    if (cacheable) structureCache.set(path, { at: Date.now(), data })
     return data
   }
 })
