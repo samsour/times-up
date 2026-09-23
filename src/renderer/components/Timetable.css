@@ -510,3 +510,35 @@
   font-style: italic;
   padding: 5px 8px;
 }
+
+.edit-now {
+  display: flex;
+  align-items: center;
+  color: var(--success);
+  cursor: default;
+}
+
+.popup-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.popup-close:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+/* room for the close button next to the time row */
+.timetable-edit-form .edit-times {
+  padding-right: 22px;
+}
