@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Setup from './components/Setup.jsx'
 import Tracker from './components/Tracker.jsx'
+import { loadAppearance, applyTone, applyAccent } from './lib/theme.js'
 
 function resolveTheme(pref) {
   if (pref === 'auto') {
@@ -38,10 +39,24 @@ export default function App() {
       setFont(resolvedFont)
       applyTheme(pref)
       document.documentElement.dataset.font = resolvedFont
+      const { tone, accent } = await loadAppearance()
+      applyTone(tone)
+      applyAccent(accent)
       setReady(true)
     }
     init()
   }, [])
+
+  // Appearance changed in the other window: apply it here too
+  useEffect(() => {
+    if (!ready) return
+    return window.api.store.onChange(({ key, value }) => {
+      if (key === 'theme') { const t = value || 'dark'; setTheme(t); applyTheme(t) }
+      if (key === 'font') { const f = value || 'serif'; setFont(f); document.documentElement.dataset.font = f }
+      if (key === 'tone') applyTone(value)
+      if (key === 'accent') applyAccent(value)
+    })
+  }, [ready])
 
   // Keep auto theme in sync with system changes
   useEffect(() => {

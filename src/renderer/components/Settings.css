@@ -409,3 +409,28 @@
 .archive-status-error {
   color: var(--danger, #e5484d);
 }
+
+.accent-swatches {
+  display: flex;
+  gap: 7px;
+}
+
+.accent-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--border-strong);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.accent-swatch:hover {
+  transform: scale(1.12);
+}
+
+.accent-swatch-active {
+  border-color: var(--bg);
+  box-shadow: 0 0 0 2px var(--text);
+}

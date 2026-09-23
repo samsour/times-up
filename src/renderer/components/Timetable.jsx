@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { createTimeEntry, updateTimeEntry, deleteTimeEntry, searchTasks } from '../lib/clickup.js'
+import { createTimeEntry, updateTimeEntry, deleteTimeEntry, searchTasks, startTimer, stopTimer, getCurrentTimer } from '../lib/clickup.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { formatDurationShort, formatTime, startOfDay } from '../lib/time.js'
 import './Timetable.css'
@@ -45,6 +45,9 @@ export default function Timetable({
   const [saving, setSaving] = useState(false)
   const [draggingBlock, setDraggingBlock] = useState(null)
   const [editing, setEditing] = useState(null) // { entry }
+  // Hovering a card on the left highlights all of its blocks; hovering a
+  // block highlights only that block (the card still lights up)
+  const [hoveredBlockId, setHoveredBlockId] = useState(null)
   const [editStart, setEditStart] = useState(0)
   const [editEnd, setEditEnd] = useState(0)
   const [editTaskText, setEditTaskText] = useState('')
@@ -153,6 +156,23 @@ export default function Timetable({
       setEditing(null)
       await onChange?.()
       if (editTaskPicked) onTaskTracked?.(editTaskPicked.id)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Start a fresh timer on the same task (or description) as this entry
+  async function resumeEntry(entry) {
+    setSaving(true)
+    try {
+      const running = await getCurrentTimer(teamId)
+      if (running?.id) await stopTimer(teamId)
+      await startTimer(teamId, entry.task?.id || null, entry.task?.id ? '' : (entry.description || ''))
+      setEditing(null)
+      await onChange?.()
+      if (entry.task?.id) onTaskTracked?.(entry.task.id)
     } catch (err) {
       alert(err.message)
     } finally {
@@ -481,7 +501,8 @@ export default function Timetable({
               const subW = (colW - 6) / laneCount
               const left = COLS_X + lane * subW
               const blockW = subW - (lane < laneCount - 1 ? 2 : 0)
-              const isHl = hoverKey && blockKey(entry) === hoverKey
+              const isHl = hoverKey && blockKey(entry) === hoverKey &&
+                (hoveredBlockId === null || hoveredBlockId === entry.id)
               const listColor = !isRunning
                 ? listColors?.[entry.task_location?.list_id || entry.task?.list?.id]
                 : null
@@ -509,8 +530,8 @@ export default function Timetable({
                       : `${label} · ${formatDurationShort(duration)}`
                     : undefined}
                   onMouseDown={!isRunning && !cont ? e => handleBlockMouseDown(e, entry, 'move') : undefined}
-                  onMouseEnter={() => onHoverBlock?.(blockKey(entry))}
-                  onMouseLeave={() => onHoverBlock?.(null)}
+                  onMouseEnter={() => { setHoveredBlockId(entry.id); onHoverBlock?.(blockKey(entry)) }}
+                  onMouseLeave={() => { setHoveredBlockId(null); onHoverBlock?.(null) }}
                 >
                   {height >= 18 && (
                     <span className="timetable-block-name">
@@ -526,6 +547,19 @@ export default function Timetable({
                           ? `from yesterday ${formatTime(realStart)}`
                           : formatDurationShort(duration)}
                     </span>
+                  )}
+                  {/* Only blocks with room for it get the corner button; short
+                      ones still offer Resume in their edit popover */}
+                  {!isRunning && height >= 44 && (
+                    <button
+                      className="timetable-block-resume"
+                      title="Resume this task"
+                      disabled={saving}
+                      onMouseDown={e => e.stopPropagation()}
+                      onClick={e => { e.stopPropagation(); resumeEntry(entry) }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    </button>
                   )}
                   {!isRunning && !cont && (
                     <div
@@ -701,8 +735,18 @@ export default function Timetable({
                   </div>
                 )}
                 <div className="draft-actions">
-                  <button className="edit-delete" onClick={deleteEdit} disabled={saving}>Delete</button>
-                  <button className="draft-cancel" onClick={() => setEditing(null)}>Cancel</button>
+                  <div className="edit-actions-left">
+                    <button className="edit-icon-btn edit-icon-btn-danger" onClick={deleteEdit} disabled={saving} title="Delete entry">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                      </svg>
+                    </button>
+                    {editing.entry.id !== currentEntry?.id && (
+                      <button className="edit-icon-btn" onClick={() => resumeEntry(editing.entry)} disabled={saving} title="Resume this task">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                      </button>
+                    )}
+                  </div>
                   <button className="draft-save" onClick={saveEdit} disabled={saving}>
                     {saving ? 'Saving…' : 'Save'}
                   </button>
@@ -717,6 +761,8 @@ export default function Timetable({
   )
 }
 
+// Hand-rolled: some locales render noon as "0 pm" with hour12 formatting
 function formatHour(ms) {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', hour12: true })
+  const h = new Date(ms).getHours()
+  return `${h % 12 || 12} ${h < 12 ? 'am' : 'pm'}`
 }

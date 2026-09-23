@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getTimeEntries, getUser } from '../lib/clickup.js'
 import { getGoals } from '../lib/goals.js'
 import { loadArchive, clearArchiveCache } from '../lib/archive.js'
+import { TONES, ACCENTS, loadAppearance, applyTone, applyAccent } from '../lib/theme.js'
 import './Settings.css'
 
 function pad(n) { return String(n).padStart(2, '0') }
@@ -48,6 +49,8 @@ function downloadCSV(content, filename) {
 export default function Settings({ teamId, theme, onThemeChange, font, onFontChange, onSignOut }) {
   const [autoLaunch, setAutoLaunch] = useState(false)
   const [openAsWindow, setOpenAsWindow] = useState(false)
+  const [tone, setTone] = useState('warm')
+  const [accent, setAccent] = useState('coral')
   const [idleDetection, setIdleDetection] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
@@ -67,6 +70,13 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   useEffect(() => {
     window.api.app.getLoginItemSettings().then(setAutoLaunch)
     window.api.store.get('open_as_window').then(v => setOpenAsWindow(!!v))
+    loadAppearance().then(a => { setTone(a.tone); setAccent(a.accent) })
+    const offStore = window.api.store.onChange(({ key, value }) => {
+      if (key === 'tone') setTone(value || 'warm')
+      if (key === 'accent') setAccent(value || 'coral')
+      if (key === 'open_as_window') setOpenAsWindow(!!value)
+      if (key === 'archive_urls') setArchiveUrls(value || '')
+    })
     window.api.store.get('idleDetection').then(v => setIdleDetection(!!v))
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
@@ -80,7 +90,8 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       setArchiveUrls(v || '')
       if (v) refreshArchive(false)
     })
-    return window.api.updater.onStateChange(setUpdateState)
+    const offUpdater = window.api.updater.onStateChange(setUpdateState)
+    return () => { offUpdater(); offStore() }
   }, [])
 
   async function refreshArchive(force) {
@@ -190,6 +201,34 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
             >
               Light
             </button>
+          </div>
+        </div>
+        <div className="settings-row">
+          <span className="settings-row-title">Tone</span>
+          <div className="theme-toggle">
+            {TONES.map(t => (
+              <button
+                key={t.id}
+                className={`theme-btn ${tone === t.id ? 'theme-btn-active' : ''}`}
+                onClick={async () => { setTone(t.id); applyTone(t.id); await window.api.store.set('tone', t.id) }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="settings-row">
+          <span className="settings-row-title">Accent</span>
+          <div className="accent-swatches">
+            {ACCENTS.map(a => (
+              <button
+                key={a.id}
+                className={`accent-swatch ${accent === a.id ? 'accent-swatch-active' : ''}`}
+                style={{ '--swatch': a.swatch }}
+                title={a.label}
+                onClick={async () => { setAccent(a.id); applyAccent(a.id); await window.api.store.set('accent', a.id) }}
+              />
+            ))}
           </div>
         </div>
         <div className="settings-row">

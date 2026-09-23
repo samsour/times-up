@@ -272,8 +272,16 @@ app.on('window-all-closed', (e) => {
 
 // IPC: persisted settings
 ipcMain.handle('store:get', (_, key) => store.get(key))
-ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
-ipcMain.handle('store:delete', (_, key) => store.delete(key))
+// Both windows keep their own copy of settings in memory, so every change
+// is broadcast and each renderer applies what it cares about
+ipcMain.handle('store:set', (_, key, value) => {
+  store.set(key, value)
+  broadcast('store:changed', { key, value })
+})
+ipcMain.handle('store:delete', (_, key) => {
+  store.delete(key)
+  broadcast('store:changed', { key, value: undefined })
+})
 
 // Workspace structure (spaces, folders, lists, members) changes rarely but
 // is walked by several views in both windows; one shared cache in main

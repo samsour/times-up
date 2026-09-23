@@ -137,11 +137,7 @@
 }
 
 .timetable-block:hover {
-  background: rgba(255, 122, 89, 0.28);
-}
-
-[data-theme="light"] .timetable-block:hover {
-  background: rgba(232, 84, 58, 0.22);
+  background: var(--accent-hover);
 }
 
 .timetable-block-live {
@@ -151,6 +147,37 @@
 
 [data-theme="light"] .timetable-block-live {
   background: rgba(22, 163, 74, 0.09);
+}
+
+.timetable-block-resume {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text);
+  background: var(--bg-elevated);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+  cursor: pointer;
+}
+
+.timetable-block:hover .timetable-block-resume {
+  opacity: 1;
+}
+
+.timetable-block-resume:hover:not(:disabled) {
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+.timetable-block-dragging .timetable-block-resume {
+  opacity: 0;
 }
 
 .timetable-block-live .timetable-block-name {
@@ -308,23 +335,45 @@
   filter: brightness(1.15);
 }
 
-.edit-delete {
+.edit-actions-left {
+  display: flex;
+  gap: 6px;
   margin-right: auto;
-  padding: 5px 12px;
-  font-size: 12px;
-  color: var(--text-muted);
-  border-radius: 999px;
+}
+
+.edit-icon-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-dim);
   cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
-.edit-delete:hover {
-  color: var(--danger);
-  background: rgba(248, 113, 113, 0.1);
+.edit-icon-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: var(--bg-hover);
 }
 
-.edit-delete:disabled {
+.edit-icon-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.edit-icon-btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.edit-icon-btn-danger:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: rgba(248, 113, 113, 0.1);
 }
 
 .draft-cancel {

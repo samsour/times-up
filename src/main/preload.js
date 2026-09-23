@@ -4,7 +4,12 @@ contextBridge.exposeInMainWorld('api', {
   store: {
     get: (key) => ipcRenderer.invoke('store:get', key),
     set: (key, value) => ipcRenderer.invoke('store:set', key, value),
-    delete: (key) => ipcRenderer.invoke('store:delete', key)
+    delete: (key) => ipcRenderer.invoke('store:delete', key),
+    onChange: (cb) => {
+      const handler = (_, change) => cb(change)
+      ipcRenderer.on('store:changed', handler)
+      return () => ipcRenderer.removeListener('store:changed', handler)
+    }
   },
   clickup: {
     request: (opts) => ipcRenderer.invoke('clickup:request', opts),
