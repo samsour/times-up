@@ -319,14 +319,8 @@ function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, on
       onDrop={e => { e.preventDefault(); receiveDrop() }}
     >
       <div className="entry-card-top">
-        {/* The whole title area resumes the task; stopping stays on the
-            explicit button so a stray click can't end a running timer */}
-        <div
-          className={`entry-card-info ${!isRunning && mode === null ? 'entry-card-info-clickable' : ''}`}
-          onClick={() => { if (!isRunning && !busy && mode === null) handlePlay() }}
-          title={isRunning ? name : `Resume · ${name}`}
-        >
-          <div className="entry-card-name">{name}</div>
+        <div className="entry-card-info">
+          <div className="entry-card-name" title={name}>{name}</div>
           <div className="entry-card-meta">
             {isUnassigned ? (
               <span className="entry-card-unassigned">unassigned</span>

@@ -208,14 +208,6 @@
   font-style: italic;
 }
 
-.entry-card-info-clickable {
-  cursor: pointer;
-}
-
-.entry-card-info-clickable:hover .entry-card-name {
-  color: var(--accent);
-}
-
 .entry-card-side {
   display: flex;
   align-items: center;
