@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { getTimeEntries, getTeamMembers, getListColors, canViewOthersTime } from '../lib/clickup.js'
+import { getTimeEntries, getTeamMembers, getListColors, canViewOthersTime, getUser } from '../lib/clickup.js'
+import { getArchiveEntries } from '../lib/archive.js'
 import { formatDurationShort, startOfDay, endOfDay, startOfWeek, startOfMonth, countWorkdays } from '../lib/time.js'
 import { getGoals } from '../lib/goals.js'
 import './Reports.css'
@@ -16,6 +17,8 @@ export default function Reports({ teamId, userId }) {
   const [goalMs, setGoalMs] = useState(0)
   const [listColors, setListColors] = useState({})
   const [workdays, setWorkdays] = useState([1, 2, 3, 4, 5]) // getDay() numbers
+  const [me, setMe] = useState(null)
+  const [archiveCount, setArchiveCount] = useState(0)
 
   useEffect(() => {
     getGoals().then(g => {
@@ -31,6 +34,7 @@ export default function Reports({ teamId, userId }) {
   useEffect(() => {
     window.api.store.get('stats_range').then(r => { if (r) setRange(r) })
     getTeamMembers(teamId).then(setMembers).catch(() => {})
+    getUser().then(setMe).catch(() => {})
   }, [teamId])
 
   const isAdmin = canViewOthersTime(members, userId)
@@ -40,7 +44,7 @@ export default function Reports({ teamId, userId }) {
     if (who === 'all' && !members.length) return // wait for member list
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range, teamId, who, members])
+  }, [range, teamId, who, members, me])
 
   async function load() {
     setLoading(true)
@@ -52,8 +56,18 @@ export default function Reports({ teamId, userId }) {
       else if (isAdmin && who !== 'me') assignees = [who]
       // All time: ClickUp defaults to the last 30 days without a start_date, so pass epoch-ish 1
       const start = days ? days[0] : 1
-      const data = await getTimeEntries(teamId, start, endOfDay(), assignees)
-      setEntries((data || []).filter(e => parseInt(e.duration) > 0))
+      const end = endOfDay()
+      // Archived (pre-ClickUp) entries are matched to people by email, so
+      // the same "who" filter applies to both sources
+      let emails = null
+      if (!isAdmin || who === 'me') emails = me?.email ? [me.email] : []
+      else if (who !== 'all') emails = [members.find(m => String(m.id) === who)?.email].filter(Boolean)
+      const [data, archived] = await Promise.all([
+        getTimeEntries(teamId, start, end, assignees),
+        getArchiveEntries(start, end, { emails, members }).catch(() => []),
+      ])
+      setArchiveCount(archived.length)
+      setEntries([...(data || []).filter(e => parseInt(e.duration) > 0), ...archived])
     } catch (e) {
       setError(e.message)
     } finally {
@@ -163,6 +177,12 @@ export default function Reports({ teamId, userId }) {
                 />
               )}
             </div>
+
+            {archiveCount > 0 && (
+              <div className="stats-archive-note">
+                Includes {archiveCount} archived {archiveCount === 1 ? 'entry' : 'entries'} from Toggl
+              </div>
+            )}
 
             {days && (
               <>

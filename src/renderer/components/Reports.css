@@ -261,3 +261,10 @@
   border-radius: 999px;
   transition: width 0.25s ease-out;
 }
+
+.stats-archive-note {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: -4px 0 4px;
+  text-align: right;
+}

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getTimeEntries, getUser } from '../lib/clickup.js'
 import { getGoals } from '../lib/goals.js'
+import { loadArchive, clearArchiveCache } from '../lib/archive.js'
 import './Settings.css'
 
 function pad(n) { return String(n).padStart(2, '0') }
@@ -30,6 +31,10 @@ function entriesToCSV(entries, user) {
   return [headers.join(','), ...rows].join('\n')
 }
 
+function shortUrl(url) {
+  try { return new URL(url).hostname } catch { return url.slice(0, 30) }
+}
+
 function downloadCSV(content, filename) {
   const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
@@ -53,6 +58,10 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [exportFrom, setExportFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-01` })
   const [exportTo, setExportTo] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` })
   const [exporting, setExporting] = useState(false)
+  const [archiveUrls, setArchiveUrls] = useState('')
+  const [archiveStatus, setArchiveStatus] = useState(null) // { files, entries }
+  const [archiveLoading, setArchiveLoading] = useState(false)
+  const archiveSaveTimer = useRef(null)
 
   useEffect(() => {
     window.api.app.getLoginItemSettings().then(setAutoLaunch)
@@ -65,8 +74,34 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
     })
     window.api.store.get('auto_progress').then(v => setAutoProgress(v !== false))
     window.api.updater.getState().then(setUpdateState)
+    window.api.store.get('archive_urls').then(v => {
+      setArchiveUrls(v || '')
+      if (v) refreshArchive(false)
+    })
     return window.api.updater.onStateChange(setUpdateState)
   }, [])
+
+  async function refreshArchive(force) {
+    setArchiveLoading(true)
+    try {
+      if (force) clearArchiveCache()
+      const { files, entries } = await loadArchive(force)
+      setArchiveStatus({ files, entries: entries.length })
+    } catch (e) {
+      setArchiveStatus({ files: [], entries: 0, error: e.message })
+    } finally {
+      setArchiveLoading(false)
+    }
+  }
+
+  async function handleArchiveUrls(val) {
+    setArchiveUrls(val)
+    await window.api.store.set('archive_urls', val)
+    clearArchiveCache()
+    // Wait for typing/pasting to settle before downloading
+    clearTimeout(archiveSaveTimer.current)
+    archiveSaveTimer.current = setTimeout(() => refreshArchive(true), 800)
+  }
 
   async function handleIdleText(val) {
     setIdleText(val)
@@ -358,6 +393,51 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
                   onChange={e => setExportTo(e.target.value)}
                 />
               </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-label">
+          Archive
+          <span className="settings-label-badge">Toggl</span>
+        </div>
+        <div className="export-card">
+          <div className="archive-hint">
+            Links to Toggl detailed CSV exports, one per line. Google Drive, Sheets and Dropbox
+            share links work as long as anyone with the link can view. Reports include these
+            entries alongside ClickUp.
+          </div>
+          <textarea
+            className="archive-urls"
+            rows={3}
+            spellCheck={false}
+            placeholder="https://drive.google.com/file/d/…/view"
+            value={archiveUrls}
+            onChange={e => handleArchiveUrls(e.target.value)}
+          />
+          {archiveUrls.trim() && (
+            <div className="archive-status">
+              <div className="archive-status-lines">
+                {archiveLoading && <span className="archive-status-line">Loading…</span>}
+                {!archiveLoading && archiveStatus && (
+                  <>
+                    <span className="archive-status-line">
+                      {archiveStatus.entries} {archiveStatus.entries === 1 ? 'entry' : 'entries'}
+                      {' · '}{archiveStatus.files.length} {archiveStatus.files.length === 1 ? 'file' : 'files'}
+                    </span>
+                    {archiveStatus.files.filter(f => f.error).map(f => (
+                      <span key={f.url} className="archive-status-line archive-status-error" title={f.url}>
+                        {shortUrl(f.url)}: {f.error}
+                      </span>
+                    ))}
+                  </>
+                )}
+              </div>
+              <button className="settings-update-btn" disabled={archiveLoading} onClick={() => refreshArchive(true)}>
+                Refresh
+              </button>
             </div>
           )}
         </div>

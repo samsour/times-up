@@ -3,6 +3,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Store from 'electron-store'
 import { autoUpdater } from 'electron-updater'
+import fs from 'node:fs'
+import crypto from 'node:crypto'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const store = new Store()
@@ -260,6 +262,74 @@ ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
     if (!res.ok) throw new Error(data.err || `HTTP ${res.status}`)
     return data
   }
+})
+
+// IPC: archived time entries (Toggl CSV exports) fetched from plain share
+// links. Files are cached on disk so Reports doesn't hit the network on
+// every range change; force re-downloads regardless of age.
+const ARCHIVE_MAX_AGE = 24 * 3600 * 1000
+
+// Turns the share links people actually paste into direct-download URLs
+function directDownloadUrl(url) {
+  let m
+  if ((m = url.match(/docs\.google\.com\/spreadsheets\/d\/([\w-]+)/))) {
+    const gid = (url.match(/[#&?]gid=(\d+)/) || [])[1]
+    return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv${gid ? `&gid=${gid}` : ''}`
+  }
+  if ((m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:.*&)?id=)([\w-]+)/))) {
+    return `https://drive.usercontent.google.com/download?id=${m[1]}&export=download&confirm=t`
+  }
+  if ((m = url.match(/^https?:\/\/(?:www\.)?dropbox\.com\/(.+)$/))) {
+    return `https://www.dropbox.com/${m[1].replace(/[?&]dl=0/, '')}${m[1].includes('?') ? '&' : '?'}dl=1`
+  }
+  return url
+}
+
+function archiveDir() {
+  const dir = path.join(app.getPath('userData'), 'archive')
+  fs.mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+async function loadArchiveFile(url, force) {
+  const key = crypto.createHash('sha1').update(url).digest('hex').slice(0, 16)
+  const file = path.join(archiveDir(), `${key}.csv`)
+  const metaFile = path.join(archiveDir(), `${key}.json`)
+  let meta = null
+  try { meta = JSON.parse(fs.readFileSync(metaFile, 'utf8')) } catch {}
+  const fresh = meta && fs.existsSync(file) && Date.now() - meta.fetchedAt < ARCHIVE_MAX_AGE
+
+  if (!fresh || force) {
+    try {
+      const res = await fetch(directDownloadUrl(url), { redirect: 'follow' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const text = await res.text()
+      const type = res.headers.get('content-type') || ''
+      // A login or "confirm download" page means the link isn't public
+      if (type.includes('text/html') || /^\s*<(!doctype|html)/i.test(text)) {
+        throw new Error('Link is not publicly downloadable')
+      }
+      fs.writeFileSync(file, text)
+      meta = { url, fetchedAt: Date.now(), bytes: text.length }
+      fs.writeFileSync(metaFile, JSON.stringify(meta))
+      return { url, text, fetchedAt: meta.fetchedAt, error: null }
+    } catch (e) {
+      // Fall back to a stale copy if there is one
+      if (meta && fs.existsSync(file)) {
+        return { url, text: fs.readFileSync(file, 'utf8'), fetchedAt: meta.fetchedAt, error: e.message }
+      }
+      return { url, text: null, fetchedAt: null, error: e.message }
+    }
+  }
+  return { url, text: fs.readFileSync(file, 'utf8'), fetchedAt: meta.fetchedAt, error: null }
+}
+
+ipcMain.handle('archive:load', async (_, { force = false } = {}) => {
+  const urls = String(store.get('archive_urls') || '')
+    .split(/\s+/)
+    .map(u => u.trim())
+    .filter(u => /^https?:\/\//.test(u))
+  return Promise.all(urls.map(u => loadArchiveFile(u, force)))
 })
 
 // The renderer reads the tray poll's cached timer instead of polling the

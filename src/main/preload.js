@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('api', {
     request: (opts) => ipcRenderer.invoke('clickup:request', opts),
     currentTimer: (force) => ipcRenderer.invoke('clickup:currentTimer', { force })
   },
+  archive: {
+    load: (force) => ipcRenderer.invoke('archive:load', { force })
+  },
   window: {
     hide: () => ipcRenderer.invoke('window:hide')
   },
