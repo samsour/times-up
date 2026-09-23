@@ -8,14 +8,12 @@ on:
 permissions:
   contents: write
 
+# The jobs run one after the other on purpose: when both platforms publish
+# at the same time, each one sees no release for the tag yet and creates
+# its own, leaving two releases with the assets split between them.
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
-
-    runs-on: ${{ matrix.os }}
-
+  mac:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +29,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build & publish (mac, signed + notarized)
-        if: matrix.os == 'macos-latest'
         run: pnpm run build:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -41,8 +38,24 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+  win:
+    needs: mac
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
       - name: Build & publish (win)
-        if: matrix.os == 'windows-latest'
         run: pnpm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
