@@ -79,6 +79,7 @@ function openStandaloneWindow(view = null) {
   if (standaloneWin) {
     standaloneWin.show()
     standaloneWin.focus()
+    syncTimerOnce()
     if (view) standaloneWin.webContents.send('view:set', view)
     return
   }
@@ -108,7 +109,7 @@ function openStandaloneWindow(view = null) {
     standaloneWin.loadFile(path.join(__dirname, '../../dist/index.html'), { query: { win: 'window' } })
   }
 
-  standaloneWin.once('ready-to-show', () => standaloneWin.show())
+  standaloneWin.once('ready-to-show', () => { standaloneWin.show(); syncTimerOnce() })
 
   if (process.platform === 'darwin') app.dock?.show()
 
@@ -150,6 +151,7 @@ function toggleWindow() {
     positionWindow()
     win.show()
     win.focus()
+    syncTimerOnce()
   }
 }
 
@@ -168,6 +170,7 @@ async function syncTimer() {
     // Keep the last known state on errors (e.g. 429) instead of flickering
     if (!res.ok) { updateTrayTitle(); return }
     const { data } = await res.json()
+    if (isDev) console.log(`[timer] synced, next in ${timerPollInterval() / 1000}s (${anyWindowVisible() ? 'window visible' : activeTimer ? 'timer running' : 'idle'})`)
     currentEntry = data || null
     activeTimer = data
       ? { start: parseInt(data.start), label: (data.task?.name || data.description || '').slice(0, 30) }
@@ -176,9 +179,34 @@ async function syncTimer() {
   updateTrayTitle()
 }
 
+let lastTimerSync = 0
+
 function syncTimerOnce() {
-  if (!timerSync) timerSync = syncTimer().finally(() => { timerSync = null })
+  if (!timerSync) {
+    lastTimerSync = Date.now()
+    timerSync = syncTimer().finally(() => { timerSync = null })
+  }
   return timerSync
+}
+
+// The running-timer poll is the app's only steady API traffic, so its pace
+// follows how likely the answer is to matter: fast while someone is
+// looking, slower with just the tray title to keep, slowest when nothing
+// is running or the machine sits unused. Windows force a sync on show.
+function anyWindowVisible() {
+  return (win && !win.isDestroyed() && win.isVisible()) ||
+    (standaloneWin && !standaloneWin.isDestroyed() && standaloneWin.isVisible() && !standaloneWin.isMinimized())
+}
+
+function timerPollInterval() {
+  if (powerMonitor.getSystemIdleTime() > 10 * 60) return 5 * 60_000
+  if (anyWindowVisible()) return 10_000
+  if (activeTimer) return 30_000
+  return 60_000
+}
+
+function pollTimerIfDue() {
+  if (Date.now() - lastTimerSync >= timerPollInterval()) syncTimerOnce()
 }
 
 function updateTrayTitle() {
@@ -211,7 +239,11 @@ function createTray() {
 
   syncTimerOnce()
   setInterval(updateTrayTitle, 10_000)
-  setInterval(syncTimerOnce, 10_000)
+  setInterval(pollTimerIfDue, 10_000)
+  // Catch up right away after sleep or a locked screen instead of waiting
+  // for the next slow interval
+  powerMonitor.on('resume', syncTimerOnce)
+  powerMonitor.on('unlock-screen', syncTimerOnce)
 
   // Right-click menu for quitting
   tray.on('right-click', () => {
