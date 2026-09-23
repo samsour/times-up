@@ -40,9 +40,14 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+      # The release commit's body is the changelog; use it as the notes
+      - name: Release notes from commit message
+        run: git log -1 --format=%b > release-notes.md
+
       - name: Upload to GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           fail_on_unmatched_files: true
           files: |
             release/*.dmg
