@@ -14,7 +14,14 @@ contextBridge.exposeInMainWorld('api', {
     load: (force) => ipcRenderer.invoke('archive:load', { force })
   },
   window: {
-    hide: () => ipcRenderer.invoke('window:hide')
+    hide: () => ipcRenderer.invoke('window:hide'),
+    getInfo: () => ipcRenderer.invoke('window:getInfo'),
+    openStandalone: (view) => ipcRenderer.invoke('window:openStandalone', view),
+    onSetView: (cb) => {
+      const handler = (_, view) => cb(view)
+      ipcRenderer.on('view:set', handler)
+      return () => ipcRenderer.removeListener('view:set', handler)
+    }
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)

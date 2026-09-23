@@ -59,9 +59,9 @@ function createWindow() {
   })
 
   if (isDev) {
-    win.loadURL('http://localhost:5173')
+    win.loadURL('http://localhost:5173?win=popover')
   } else {
-    win.loadFile(path.join(__dirname, '../../dist/index.html'))
+    win.loadFile(path.join(__dirname, '../../dist/index.html'), { query: { win: 'popover' } })
   }
 
   win.on('blur', () => {
@@ -71,12 +71,18 @@ function createWindow() {
   })
 }
 
-function openStandaloneWindow() {
+// View the standalone window should show once it has loaded; the renderer
+// picks it up through window:getInfo, or via view:set when already open
+let pendingStandaloneView = null
+
+function openStandaloneWindow(view = null) {
   if (standaloneWin) {
     standaloneWin.show()
     standaloneWin.focus()
+    if (view) standaloneWin.webContents.send('view:set', view)
     return
   }
+  pendingStandaloneView = view
 
   const savedBounds = store.get('standalone_bounds')
   standaloneWin = new BrowserWindow({
@@ -97,9 +103,9 @@ function openStandaloneWindow() {
   })
 
   if (isDev) {
-    standaloneWin.loadURL('http://localhost:5173')
+    standaloneWin.loadURL('http://localhost:5173?win=window')
   } else {
-    standaloneWin.loadFile(path.join(__dirname, '../../dist/index.html'))
+    standaloneWin.loadFile(path.join(__dirname, '../../dist/index.html'), { query: { win: 'window' } })
   }
 
   standaloneWin.once('ready-to-show', () => standaloneWin.show())
@@ -198,7 +204,10 @@ function createTray() {
 
   tray = new Tray(icon)
   tray.setToolTip('TimesUp')
-  tray.on('click', toggleWindow)
+  tray.on('click', () => {
+    if (store.get('open_as_window')) openStandaloneWindow()
+    else toggleWindow()
+  })
 
   syncTimerOnce()
   setInterval(updateTrayTitle, 10_000)
@@ -340,6 +349,13 @@ ipcMain.handle('clickup:currentTimer', async (_, opts) => {
 })
 
 ipcMain.handle('window:hide', () => win.hide())
+ipcMain.handle('window:getInfo', (e) => {
+  const kind = standaloneWin && e.sender === standaloneWin.webContents ? 'window' : 'popover'
+  const view = kind === 'window' ? pendingStandaloneView : null
+  pendingStandaloneView = null
+  return { kind, view }
+})
+ipcMain.handle('window:openStandalone', (_, view) => openStandaloneWindow(view || null))
 ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
 ipcMain.handle('update:check', () => { if (updateState === 'idle') autoUpdater.checkForUpdates() })
 ipcMain.handle('update:getState', () => updateState)

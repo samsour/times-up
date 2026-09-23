@@ -47,6 +47,7 @@ function downloadCSV(content, filename) {
 
 export default function Settings({ teamId, theme, onThemeChange, font, onFontChange, onSignOut }) {
   const [autoLaunch, setAutoLaunch] = useState(false)
+  const [openAsWindow, setOpenAsWindow] = useState(false)
   const [idleDetection, setIdleDetection] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
@@ -65,6 +66,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
 
   useEffect(() => {
     window.api.app.getLoginItemSettings().then(setAutoLaunch)
+    window.api.store.get('open_as_window').then(v => setOpenAsWindow(!!v))
     window.api.store.get('idleDetection').then(v => setIdleDetection(!!v))
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
@@ -219,6 +221,21 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
           <button
             className={`settings-toggle ${autoLaunch ? 'settings-toggle-on' : ''}`}
             onClick={() => handleAutoLaunch(!autoLaunch)}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
+        </div>
+        <div className="settings-row">
+          <span className="settings-row-title" title="Clicking the menu bar icon opens the persistent window instead of the popover">
+            Open as window
+          </span>
+          <button
+            className={`settings-toggle ${openAsWindow ? 'settings-toggle-on' : ''}`}
+            onClick={async () => {
+              const next = !openAsWindow
+              setOpenAsWindow(next)
+              await window.api.store.set('open_as_window', next)
+            }}
           >
             <span className="settings-toggle-knob" />
           </button>

@@ -67,6 +67,13 @@
   font-weight: 600;
 }
 
+.tracker-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
 .tracker-settings {
   width: 30px;
   height: 30px;
