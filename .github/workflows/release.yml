@@ -8,9 +8,12 @@ on:
 permissions:
   contents: write
 
-# The jobs run one after the other on purpose: when both platforms publish
-# at the same time, each one sees no release for the tag yet and creates
-# its own, leaving two releases with the assets split between them.
+# electron-builder does not publish here on purpose: its GitHub publisher
+# can create the release twice when several artifacts finish at the same
+# moment (one per concurrent upload), which leaves two releases on one tag
+# with the files split between them. Instead the artifacts are uploaded
+# with action-gh-release, which creates the release once and appends to it.
+# The jobs run in sequence for the same reason.
 jobs:
   mac:
     runs-on: macos-latest
@@ -28,15 +31,24 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build & publish (mac, signed + notarized)
-        run: pnpm run build:mac
+      - name: Build (mac, signed + notarized)
+        run: pnpm run pack:mac
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: true
+          files: |
+            release/*.dmg
+            release/*.zip
+            release/*.blockmap
+            release/latest-mac.yml
 
   win:
     needs: mac
@@ -55,7 +67,14 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build & publish (win)
-        run: pnpm run build:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (win)
+        run: pnpm run pack:win
+
+      - name: Upload to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: true
+          files: |
+            release/*.exe
+            release/*.blockmap
+            release/latest.yml

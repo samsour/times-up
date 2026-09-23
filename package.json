@@ -12,6 +12,7 @@
     "build:mac": "vite build && electron-builder --mac --publish always",
     "pack:mac": "vite build && electron-builder --mac --publish never",
     "build:win": "vite build && electron-builder --win --publish always",
+    "pack:win": "vite build && electron-builder --win --publish never",
     "preview": "vite preview",
     "release": "git tag v$(node -p \"require('./package.json').version\") && git push origin --tags && git push github main --tags"
   },
