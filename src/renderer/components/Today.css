@@ -354,3 +354,17 @@
   color: var(--accent-text);
   background: var(--accent);
 }
+
+.today-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.today-view-switch {
+  -webkit-app-region: no-drag;
+}
+
+.today-nav-label-wide {
+  min-width: 110px;
+}

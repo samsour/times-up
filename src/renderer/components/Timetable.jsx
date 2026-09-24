@@ -4,12 +4,12 @@ import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { formatDurationShort, formatTime, startOfDay } from '../lib/time.js'
 import './Timetable.css'
 
-const PX_PER_HOUR = 72
 const LABEL_W = 44
 const SNAP_MS = 15 * 60 * 1000
 const HOUR_MS = 3600000
 const DAY_MS = 24 * HOUR_MS
 const COLS_X = LABEL_W + 6
+const DAY_GAP = 4 // horizontal gap between day columns in multi-day mode
 
 function snap(ms, step = SNAP_MS) {
   return Math.round(ms / step) * step
@@ -29,21 +29,29 @@ export function blockKey(entry) {
   return entry.task?.id || `e:${entry.id}`
 }
 
-// Single-day timeline. The parent owns the entries and the selected day;
-// every mutation here goes through the API and then calls onChange().
+// Timeline for one or more days side by side (pass `days`, ascending day
+// starts; a single `day` still works). The parent owns the entries and the
+// visible days; every mutation here goes through the API, then onChange().
 export default function Timetable({
   teamId,
   day,
+  days: daysProp,
   entries,
   loading,
   currentEntry,
   onChange,
   onTaskTracked,
+  onPickDay,
+  offDays = [], // days outside the user's working days, shown muted
   hoverKey,
   onHoverBlock,
   dragCard,
   listColors,
 }) {
+  const days = daysProp && daysProp.length ? daysProp : [day]
+  const firstDay = days[0]
+  const multi = days.length > 1
+
   const [now, setNow] = useState(Date.now())
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const { px: pxPerHour, snap: snapMs } = ZOOM_LEVELS[zoom]
@@ -95,15 +103,15 @@ export default function Timetable({
     else if (pinchAcc.current >= 40) { pinchAcc.current = 0; changeZoom(-1) }
   }
   const [width, setWidth] = useState(0)
-  const [dragRange, setDragRange] = useState(null)
-  const [draft, setDraft] = useState(null)
+  const [dragRange, setDragRange] = useState(null) // { day, anchor, current }
+  const [draft, setDraft] = useState(null) // { day, start, end }
   const [draftDesc, setDraftDesc] = useState('')
   const [draftTask, setDraftTask] = useState(null) // picked { id, name }
   const [draftTaskQuery, setDraftTaskQuery] = useState('')
   const [draftTaskFocus, setDraftTaskFocus] = useState(false)
   const [saving, setSaving] = useState(false)
   const [draggingBlock, setDraggingBlock] = useState(null)
-  const [editing, setEditing] = useState(null) // { entry }
+  const [editing, setEditing] = useState(null) // { entry, running, day }
   // Hovering a card on the left highlights all of its blocks; hovering a
   // block highlights only that block (the card still lights up)
   const [hoveredBlockId, setHoveredBlockId] = useState(null)
@@ -120,8 +128,9 @@ export default function Timetable({
   const rangeStartOffRef = useRef(0)
   const geomRef = useRef(null)
 
-  const dayEnd = day + DAY_MS - 1
-  const isToday = day === startOfDay(new Date(now))
+  const todayStart = startOfDay(new Date(now))
+  const todayIdx = days.indexOf(todayStart)
+  const hasToday = todayIdx !== -1
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30000)
@@ -139,15 +148,15 @@ export default function Timetable({
     return () => ro.disconnect()
   }, [loading])
 
-  // Center the view: on "now" for today, on the first entry otherwise
+  // Center the view: on "now" when today is visible, on mid-morning otherwise
   useEffect(() => {
     if (loading || !scrollRef.current) return
-    const anchor = isToday ? Date.now() - day : 9.5 * HOUR_MS
+    const anchor = hasToday ? Date.now() - todayStart : 9.5 * HOUR_MS
     const y = ((anchor - rangeStartOffRef.current) / HOUR_MS) * pxPerHour
     const el = scrollRef.current
     el.scrollTop = y - el.clientHeight / 2
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, day])
+  }, [loading, firstDay, days.length])
 
   const { tasks: draftSuggestions } = useTaskSuggestions(teamId, undefined, draftTaskQuery, { limit: 5 })
 
@@ -176,18 +185,36 @@ export default function Timetable({
     setEditing(null)
     resetDraft()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [day])
+  }, [firstDay, days.length])
 
-  function getTimeFromEvent(e) {
+  // ── geometry helpers ──────────────────────────────────────────────────────
+  // Which day column an x position falls in
+  function dayIndexAtX(x) {
+    const g = geomRef.current
+    if (!g) return 0
+    const i = Math.floor((x - COLS_X) / (g.dayW + DAY_GAP))
+    return Math.max(0, Math.min(days.length - 1, i))
+  }
+
+  function dayIndexOf(t) {
+    for (let i = days.length - 1; i >= 0; i--) if (t >= days[i]) return i
+    return 0
+  }
+
+  // Snapped time under the pointer; the day comes from the pointer's column
+  // unless the caller pins it (dragging stays inside one day)
+  function getTimeFromEvent(e, fixedDay = null) {
     const g = geomRef.current
     if (!innerRef.current || !g) return null
     const rect = innerRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top
-    return snapT(day + g.minOff + (y / pxPerHour) * HOUR_MS)
+    const d = fixedDay ?? days[dayIndexAtX(e.clientX - rect.left)]
+    const t = snapT(d + g.minOff + (y / pxPerHour) * HOUR_MS)
+    return Math.max(d, Math.min(t, d + DAY_MS))
   }
 
   // ── entry editor popup ────────────────────────────────────────────────────
-  function openEditor(entry) {
+  function openEditor(entry, entryDay) {
     const running = currentEntry?.id === entry.id
     const start = parseInt(entry.start)
     const snappedStart = snapT(start)
@@ -198,9 +225,9 @@ export default function Timetable({
       : snapT(start + Math.max(parseInt(entry.duration || 0), 0))
     if (snappedEnd <= snappedStart) snappedEnd = snappedStart + snapMs
     resetDraft()
-    setEditing({ entry, running })
+    setEditing({ entry, running, day: entryDay })
     setEditStart(snappedStart)
-    setEditEnd(Math.min(snappedEnd, day + DAY_MS))
+    setEditEnd(Math.min(snappedEnd, entryDay + DAY_MS))
     setEditTaskText(entry.task?.name || '')
     setEditTaskPicked(null)
     setEditTaskResults(null)
@@ -281,22 +308,24 @@ export default function Timetable({
     if (draft) { resetDraft(); return }
     e.preventDefault()
 
-    const anchor = getTimeFromEvent(e)
-    setDragRange({ anchor, current: anchor })
+    const rect = innerRef.current.getBoundingClientRect()
+    const dragDay = days[dayIndexAtX(e.clientX - rect.left)]
+    const anchor = getTimeFromEvent(e, dragDay)
+    setDragRange({ day: dragDay, anchor, current: anchor })
 
     function onMove(ev) {
-      const current = getTimeFromEvent(ev)
-      if (current !== null) setDragRange({ anchor, current })
+      const current = getTimeFromEvent(ev, dragDay)
+      if (current !== null) setDragRange({ day: dragDay, anchor, current })
     }
     function onUp(ev) {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
-      const current = getTimeFromEvent(ev) ?? anchor
+      const current = getTimeFromEvent(ev, dragDay) ?? anchor
       const start = Math.min(anchor, current)
       const end = Math.max(anchor, current)
       setDragRange(null)
       if (end - start >= snapMs) {
-        setDraft({ start, end })
+        setDraft({ day: dragDay, start, end })
         setDraftDesc('')
         setDraftTask(null)
         setDraftTaskQuery('')
@@ -306,15 +335,15 @@ export default function Timetable({
     document.addEventListener('mouseup', onUp)
   }
 
-  // ── drag existing block (move or resize) ─────────────────────────────────
-  function handleBlockMouseDown(e, entry, type) {
+  // ── drag existing block (move or resize), kept within its day ────────────
+  function handleBlockMouseDown(e, entry, type, blockDay) {
     if (e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
 
     const origStart = parseInt(entry.start)
     const origDuration = parseInt(entry.duration || 0)
-    const anchorMs = getTimeFromEvent(e)
+    const anchorMs = getTimeFromEvent(e, blockDay)
 
     const initial = {
       id: entry.id,
@@ -332,12 +361,12 @@ export default function Timetable({
     function onMove(ev) {
       if (!dragStarted && Math.abs(ev.clientX - downX) < 4 && Math.abs(ev.clientY - downY) < 4) return
       dragStarted = true
-      const t = getTimeFromEvent(ev)
+      const t = getTimeFromEvent(ev, blockDay)
       if (t === null) return
       let next
       if (type === 'move') {
         let newStart = snapT(origStart + (t - anchorMs))
-        newStart = Math.max(day, Math.min(newStart, day + DAY_MS - origDuration))
+        newStart = Math.max(blockDay, Math.min(newStart, blockDay + DAY_MS - origDuration))
         next = { ...draggingRef.current, currentStart: newStart, currentEnd: newStart + origDuration }
       } else {
         const newEnd = Math.max(snapT(t), origStart + snapMs)
@@ -357,7 +386,7 @@ export default function Timetable({
 
       // A click without movement opens the editor instead
       if (!dragStarted) {
-        openEditor(entry)
+        openEditor(entry, blockDay)
         return
       }
 
@@ -403,12 +432,17 @@ export default function Timetable({
   // ── drop a card from the rail: creates a 1h entry at the drop position ───
   const DROP_DUR = HOUR_MS
 
+  function clampDrop(t) {
+    const d = days[dayIndexOf(t)]
+    return Math.min(t, d + DAY_MS - DROP_DUR)
+  }
+
   function handleDragOver(e) {
     if (!dragCard) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy'
     const t = getTimeFromEvent(e)
-    if (t !== null) setDropTime(Math.min(t, day + DAY_MS - DROP_DUR))
+    if (t !== null) setDropTime(clampDrop(t))
   }
 
   function handleDragLeave(e) {
@@ -421,7 +455,7 @@ export default function Timetable({
     const t = getTimeFromEvent(e)
     setDropTime(null)
     if (t === null) return
-    const start = Math.min(t, day + DAY_MS - DROP_DUR)
+    const start = clampDrop(t)
     try {
       await createTimeEntry(teamId, {
         taskId: dragCard.task?.id,
@@ -437,58 +471,66 @@ export default function Timetable({
   }
 
   // ── render ────────────────────────────────────────────────────────────────
-  // Entries of this day, plus overnight entries from the previous day that
+  // Per day: its entries, plus overnight entries from the previous day that
   // spill past midnight (rendered clamped, marked __cont)
-  const allBlocks = []
-  for (const e of entries || []) {
-    const s = parseInt(e.start)
-    if (s >= day && s <= dayEnd) {
-      allBlocks.push(e)
-    } else if (s < day && s + Math.max(parseInt(e.duration || 0), 0) > day) {
-      allBlocks.push({ ...e, __cont: true })
+  const blocksByDay = days.map(d => {
+    const dEnd = d + DAY_MS - 1
+    const list = []
+    for (const e of entries || []) {
+      const s = parseInt(e.start)
+      if (s >= d && s <= dEnd) {
+        list.push(e)
+      } else if (s < d && s + Math.max(parseInt(e.duration || 0), 0) > d) {
+        list.push({ ...e, __cont: true })
+      }
     }
-  }
-  if (currentEntry?.id) {
-    const s = parseInt(currentEntry.start)
-    if (s <= dayEnd && now > day) {
-      const idx = allBlocks.findIndex(e => e.id === currentEntry.id)
-      const live = { ...currentEntry, duration: String(now - s), __cont: s < day || undefined }
-      if (idx !== -1) allBlocks[idx] = live
-      else allBlocks.push(live)
+    if (currentEntry?.id) {
+      const s = parseInt(currentEntry.start)
+      if (s <= dEnd && now > d) {
+        const idx = list.findIndex(e => e.id === currentEntry.id)
+        const live = { ...currentEntry, duration: String(now - s), __cont: s < d || undefined }
+        if (idx !== -1) list[idx] = live
+        else list.push(live)
+      }
     }
-  }
+    return list
+  })
 
   if (loading) return <div className="timetable-state">Loading…</div>
 
   const colW = Math.max((width || 380) - COLS_X - 8, 50)
+  const dayW = multi ? (colW - DAY_GAP * (days.length - 1)) / days.length : colW
+  const dayX = i => COLS_X + i * (dayW + DAY_GAP)
 
-  // Vertical range, as offsets from midnight
+  // Vertical range, as offsets from midnight, shared by all visible days
   let minOff = 7 * HOUR_MS
   let maxOff = 12 * HOUR_MS
-  for (const e of allBlocks) {
-    const bStart = Math.max(parseInt(e.start), day)
-    const bEnd = parseInt(e.start) + Math.max(parseInt(e.duration || 0), 0)
-    minOff = Math.min(minOff, bStart - day)
-    maxOff = Math.max(maxOff, Math.min(Math.max(bEnd, day) - day, DAY_MS))
-  }
-  if (isToday) {
-    minOff = Math.min(minOff, now - day)
-    maxOff = Math.max(maxOff, now - day)
+  days.forEach((d, i) => {
+    for (const e of blocksByDay[i]) {
+      const bStart = Math.max(parseInt(e.start), d)
+      const bEnd = parseInt(e.start) + Math.max(parseInt(e.duration || 0), 0)
+      minOff = Math.min(minOff, bStart - d)
+      maxOff = Math.max(maxOff, Math.min(Math.max(bEnd, d) - d, DAY_MS))
+    }
+  })
+  if (hasToday) {
+    minOff = Math.min(minOff, now - todayStart)
+    maxOff = Math.max(maxOff, now - todayStart)
   }
   minOff = Math.max(Math.floor(minOff / HOUR_MS) * HOUR_MS, 0)
   maxOff = Math.min(Math.ceil(maxOff / HOUR_MS) * HOUR_MS, DAY_MS)
   rangeStartOffRef.current = minOff
-  geomRef.current = { minOff }
+  geomRef.current = { minOff, dayW }
 
   const hours = []
   for (let off = minOff; off <= maxOff; off += HOUR_MS) hours.push(off)
 
   const offToY = (off) => ((off - minOff) / HOUR_MS) * pxPerHour
 
-  const nowOff = now - day
+  const nowOff = now - todayStart
 
   const dragPreview = dragRange
-    ? { start: Math.min(dragRange.anchor, dragRange.current), end: Math.max(dragRange.anchor, dragRange.current) }
+    ? { day: dragRange.day, start: Math.min(dragRange.anchor, dragRange.current), end: Math.max(dragRange.anchor, dragRange.current) }
     : null
 
   const innerClass = [
@@ -497,10 +539,37 @@ export default function Timetable({
     draggingBlock ? 'timetable-inner-block-dragging' : '',
   ].filter(Boolean).join(' ')
 
-  const draftW = draft ? Math.min(Math.max(colW - 6, 240), colW) : 0
+  // Popups are as wide as a day column but never narrower than usable, and
+  // never past the right edge
+  function popupBox(d, minW) {
+    const w = Math.min(Math.max(dayW - 6, minW), colW)
+    const left = Math.min(dayX(days.indexOf(d)), COLS_X + colW - w)
+    return { left, width: w }
+  }
 
   return (
     <div className="timetable">
+      {multi && (
+        <div className="timetable-days-header" style={{ paddingLeft: COLS_X }}>
+          {days.map((d, i) => {
+            const dt = new Date(d)
+            const isT = d === todayStart
+            const off = offDays.includes(d)
+            return (
+              <button
+                key={d}
+                className={`timetable-day-head ${isT ? 'timetable-day-head-today' : ''} ${off ? 'timetable-day-head-off' : ''}`}
+                style={{ width: dayW, marginRight: i < days.length - 1 ? DAY_GAP : 0 }}
+                onClick={() => onPickDay?.(d)}
+                title={onPickDay ? 'Open this day' : undefined}
+              >
+                <span className="timetable-day-head-wd">{dt.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                <span className="timetable-day-head-num">{dt.getDate()}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
       <div className="timetable-scroll" ref={scrollRef} onWheel={handleWheel}>
         <div
           className={innerClass}
@@ -513,21 +582,29 @@ export default function Timetable({
         >
           {hours.map((off, i) => (
             <div key={off} className="timetable-hour" style={{ top: i * pxPerHour }}>
-              <span className="timetable-hour-label">{formatHour(day + off)}</span>
+              <span className="timetable-hour-label">{formatHour(firstDay + off)}</span>
               <div className="timetable-hour-line" />
             </div>
           ))}
 
-          {isToday && nowOff >= minOff && nowOff <= maxOff && (
+          {multi && days.slice(1).map((d, i) => (
+            <div key={d} className="timetable-day-sep" style={{ left: dayX(i + 1) - DAY_GAP / 2 }} />
+          ))}
+
+          {multi && offDays.map(d => days.includes(d) && (
+            <div key={d} className="timetable-day-off" style={{ left: dayX(days.indexOf(d)), width: dayW }} />
+          ))}
+
+          {hasToday && nowOff >= minOff && nowOff <= maxOff && (
             <div
               className="timetable-now-line"
-              style={{ top: offToY(nowOff), left: COLS_X, width: colW - 4 }}
+              style={{ top: offToY(nowOff), left: dayX(todayIdx), width: dayW - 4 }}
             />
           )}
 
-          {(() => {
+          {days.map((d, di) => {
             // Resolve display times, then assign overlapping entries to lanes
-            const renderBlocks = allBlocks.map(entry => {
+            const renderBlocks = blocksByDay[di].map(entry => {
               const isRunning = currentEntry?.id === entry.id
               const isDragging = draggingBlock?.id === entry.id
               const cont = !!entry.__cont
@@ -537,7 +614,7 @@ export default function Timetable({
                 blockStart = draggingBlock.type === 'move' ? draggingBlock.currentStart : draggingBlock.origStart
                 blockEnd = draggingBlock.currentEnd
               } else {
-                blockStart = cont ? day : realStart
+                blockStart = cont ? d : realStart
                 blockEnd = isRunning
                   ? now
                   : realStart + parseInt(entry.duration || 0)
@@ -572,13 +649,13 @@ export default function Timetable({
             return renderBlocks.map(({ entry, isRunning, isDragging, cont, realStart, blockStart, blockEnd, lane, laneCount }) => {
               const duration = blockEnd - blockStart
               const totalDuration = blockEnd - realStart
-              const startOff = blockStart - day
-              const endOff = Math.min(blockEnd - day, DAY_MS)
+              const startOff = blockStart - d
+              const endOff = Math.min(blockEnd - d, DAY_MS)
               const top = offToY(startOff)
               const height = Math.max(offToY(endOff) - top, 18)
               const label = entry.task?.name || entry.description || 'Untitled'
-              const subW = (colW - 6) / laneCount
-              const left = COLS_X + lane * subW
+              const subW = (dayW - 6) / laneCount
+              const left = dayX(di) + lane * subW
               const blockW = subW - (lane < laneCount - 1 ? 2 : 0)
               const isHl = hoverKey && blockKey(entry) === hoverKey &&
                 (hoveredBlockId === null || hoveredBlockId === entry.id)
@@ -595,6 +672,7 @@ export default function Timetable({
                     isDragging ? 'timetable-block-dragging' : '',
                     isHl ? 'timetable-block-hl' : '',
                     cont ? 'timetable-block-cont' : '',
+                    multi ? 'timetable-block-narrow' : '',
                   ].filter(Boolean).join(' ')}
                   style={{
                     top, height, left, width: blockW,
@@ -605,11 +683,11 @@ export default function Timetable({
                   }}
                   title={!isDragging
                     ? cont
-                      ? `${label} · started yesterday ${formatTime(realStart)} · ${formatDurationShort(totalDuration)} total (counts for yesterday)`
+                      ? `${label} · started the day before ${formatTime(realStart)} · ${formatDurationShort(totalDuration)} total (counts for that day)`
                       : `${label} · ${formatDurationShort(duration)}`
                     : undefined}
-                  onMouseDown={!isRunning && !cont ? e => handleBlockMouseDown(e, entry, 'move') : e => e.stopPropagation()}
-                  onClick={isRunning ? () => openEditor(entry) : undefined}
+                  onMouseDown={!isRunning && !cont ? e => handleBlockMouseDown(e, entry, 'move', d) : e => e.stopPropagation()}
+                  onClick={isRunning ? () => openEditor(entry, d) : undefined}
                   onMouseEnter={() => { setHoveredBlockId(entry.id); onHoverBlock?.(blockKey(entry)) }}
                   onMouseLeave={() => { setHoveredBlockId(null); onHoverBlock?.(null) }}
                 >
@@ -624,13 +702,13 @@ export default function Timetable({
                       {isDragging
                         ? `${formatTime(blockStart)} – ${formatTime(blockEnd)}`
                         : cont
-                          ? `from yesterday ${formatTime(realStart)}`
+                          ? `from ${formatTime(realStart)}`
                           : formatDurationShort(duration)}
                     </span>
                   )}
                   {/* Only blocks with room for it get the corner button; short
                       ones still offer Resume in their edit popover */}
-                  {!isRunning && height >= 44 && (
+                  {!isRunning && height >= 44 && blockW >= 90 && (
                     <button
                       className="timetable-block-resume"
                       title="Resume this task"
@@ -644,41 +722,44 @@ export default function Timetable({
                   {!isRunning && !cont && (
                     <div
                       className="timetable-block-resize-handle"
-                      onMouseDown={e => { e.stopPropagation(); handleBlockMouseDown(e, entry, 'resize') }}
+                      onMouseDown={e => { e.stopPropagation(); handleBlockMouseDown(e, entry, 'resize', d) }}
                     />
                   )}
                 </div>
               )
             })
-          })()}
+          })}
 
-          {dragCard && dropTime !== null && (
-            <div
-              className="timetable-drag-preview timetable-drop-preview"
-              style={{
-                top: offToY(dropTime - day),
-                height: (DROP_DUR / HOUR_MS) * pxPerHour,
-                left: COLS_X,
-                width: colW - 6,
-                ...(listColors?.[dragCard.listId] ? { borderLeftColor: listColors[dragCard.listId] } : {}),
-              }}
-            >
-              <span className="timetable-drag-label">
-                {dragCard.task?.name || dragCard.description || 'Untitled'}
-                {' · '}
-                {formatTime(dropTime)} – {formatTime(dropTime + DROP_DUR)}
-              </span>
-            </div>
-          )}
+          {dragCard && dropTime !== null && (() => {
+            const dd = days[dayIndexOf(dropTime)]
+            return (
+              <div
+                className="timetable-drag-preview timetable-drop-preview"
+                style={{
+                  top: offToY(dropTime - dd),
+                  height: (DROP_DUR / HOUR_MS) * pxPerHour,
+                  left: dayX(days.indexOf(dd)),
+                  width: dayW - 6,
+                  ...(listColors?.[dragCard.listId] ? { borderLeftColor: listColors[dragCard.listId] } : {}),
+                }}
+              >
+                <span className="timetable-drag-label">
+                  {dragCard.task?.name || dragCard.description || 'Untitled'}
+                  {' · '}
+                  {formatTime(dropTime)} – {formatTime(dropTime + DROP_DUR)}
+                </span>
+              </div>
+            )
+          })()}
 
           {dragPreview && (
             <div
               className="timetable-drag-preview"
               style={{
-                top: offToY(dragPreview.start - day),
+                top: offToY(dragPreview.start - dragPreview.day),
                 height: Math.max(((dragPreview.end - dragPreview.start) / HOUR_MS) * pxPerHour, 2),
-                left: COLS_X,
-                width: colW - 6,
+                left: dayX(days.indexOf(dragPreview.day)),
+                width: dayW - 6,
               }}
             >
               <span className="timetable-drag-label">
@@ -690,7 +771,7 @@ export default function Timetable({
           {draft && (
             <div
               className="timetable-draft-form"
-              style={{ top: offToY(draft.start - day), left: COLS_X, width: draftW }}
+              style={{ top: offToY(draft.start - draft.day), ...popupBox(draft.day, 240) }}
             >
               <div className="draft-time">
                 {formatTime(draft.start)} – {formatTime(draft.end)}
@@ -748,23 +829,23 @@ export default function Timetable({
           )}
 
           {editing && (() => {
-            const formW = Math.min(Math.max(colW - 6, 260), colW)
+            const eday = editing.day
             const totalH = hours.length * pxPerHour
-            const top = Math.max(Math.min(offToY(editStart - day), totalH - 200), 0)
+            const top = Math.max(Math.min(offToY(editStart - eday), totalH - 200), 0)
             // Running: start can be anything up to now (inclusive, so a
             // just-started timer's snapped start is still in the list)
             const startMax = editing.running
-              ? Math.min(Math.max(snapT(Date.now()), editStart), day + DAY_MS - snapMs)
-              : day + DAY_MS - snapMs
+              ? Math.min(Math.max(snapT(Date.now()), editStart), eday + DAY_MS - snapMs)
+              : eday + DAY_MS - snapMs
             const startOpts = []
-            for (let t = day; t <= startMax; t += snapMs) startOpts.push(t)
+            for (let t = eday; t <= startMax; t += snapMs) startOpts.push(t)
             if (!startOpts.includes(editStart)) startOpts.push(editStart), startOpts.sort((a, b) => a - b)
             const endOpts = []
-            for (let t = editStart + snapMs; t <= day + DAY_MS; t += snapMs) endOpts.push(t)
+            for (let t = editStart + snapMs; t <= eday + DAY_MS; t += snapMs) endOpts.push(t)
             return (
               <div
                 className="timetable-draft-form timetable-edit-form"
-                style={{ top, left: COLS_X, width: formW }}
+                style={{ top, ...popupBox(eday, 260) }}
                 onKeyDown={e => { if (e.key === 'Escape') setEditing(null) }}
               >
                 <button className="popup-close" onClick={() => setEditing(null)} title="Close (Esc)">
@@ -778,7 +859,7 @@ export default function Timetable({
                       const newStart = Number(e.target.value)
                       const duration = editEnd - editStart
                       setEditStart(newStart)
-                      if (!editing.running) setEditEnd(Math.min(newStart + duration, day + DAY_MS))
+                      if (!editing.running) setEditEnd(Math.min(newStart + duration, eday + DAY_MS))
                     }}
                   >
                     {startOpts.map(t => <option key={t} value={t}>{formatTime(t)}</option>)}

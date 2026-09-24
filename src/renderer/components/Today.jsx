@@ -9,7 +9,8 @@ import {
   getAllLists,
   getListColors,
 } from '../lib/clickup.js'
-import { formatDurationShort, formatTime, startOfDay, endOfDay } from '../lib/time.js'
+import { formatDurationShort, formatTime, formatDate, startOfDay, endOfDay, startOfWeek } from '../lib/time.js'
+import { getGoals } from '../lib/goals.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './Today.css'
 
@@ -49,8 +50,16 @@ function buildCards(entries, currentEntry, now) {
   return [...cards.values()].sort((a, b) => a.earliest - b.earliest)
 }
 
+const VIEW_KEY = `today_view_${new URLSearchParams(window.location.search).get('win') === 'window' ? 'window' : 'popover'}`
+
 export default function Today({ teamId, currentEntry, refreshKey, onChange, onTaskTracked }) {
   const [offset, setOffset] = useState(0) // days back from today
+  // 'day' shows cards + one timeline; 'week' drops the cards and shows
+  // seven columns. Week needs width, so it's only offered when wide.
+  const [viewMode, setViewMode] = useState('day')
+  const [weekOffset, setWeekOffset] = useState(0) // weeks back from this week
+  const [wide, setWide] = useState(false)
+  const [workdays, setWorkdays] = useState([1, 2, 3, 4, 5]) // getDay() numbers
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(Date.now())
@@ -65,6 +74,36 @@ export default function Today({ teamId, currentEntry, refreshKey, onChange, onTa
   d.setDate(d.getDate() - offset)
   const day = startOfDay(d)
   const dayEndMs = endOfDay(d)
+
+  const isWeek = viewMode === 'week' && wide
+  const weekStart = (() => { const w = new Date(startOfWeek(new Date(now))); w.setDate(w.getDate() - weekOffset * 7); return w.getTime() })()
+  const allWeekDays = Array.from({ length: 7 }, (_, i) => { const x = new Date(weekStart); x.setDate(x.getDate() + i); return startOfDay(x) })
+  const weekEndMs = endOfDay(new Date(allWeekDays[6]))
+  // What the timeline shows and what gets loaded
+  const rangeStart = isWeek ? weekStart : day
+  const rangeEnd = isWeek ? weekEndMs : dayEndMs
+
+  useEffect(() => {
+    window.api.store.get(VIEW_KEY).then(v => { if (v === 'week' || v === 'day') setViewMode(v) })
+    getGoals().then(g => setWorkdays(g.workdays))
+    return window.api.store.onChange(({ key }) => {
+      if (key === 'workdays') getGoals().then(g => setWorkdays(g.workdays))
+    })
+  }, [])
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setWide(el.clientWidth >= 560))
+    setWide(el.clientWidth >= 560)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  function pickViewMode(m) {
+    setViewMode(m)
+    window.api.store.set(VIEW_KEY, m)
+  }
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30000)
@@ -110,7 +149,7 @@ export default function Today({ teamId, currentEntry, refreshKey, onChange, onTa
       if (!loadedRef.current) setLoading(true)
       try {
         // include the previous day so overnight entries can render their overflow
-        const data = await getTimeEntries(teamId, day - 86400000, dayEndMs)
+        const data = await getTimeEntries(teamId, rangeStart - 86400000, rangeEnd)
         if (!cancelled) setEntries(data || [])
         loadedRef.current = true
       } catch {}
@@ -119,11 +158,11 @@ export default function Today({ teamId, currentEntry, refreshKey, onChange, onTa
     load()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamId, day, refreshKey])
+  }, [teamId, rangeStart, rangeEnd, refreshKey])
 
   async function reload() {
     try {
-      const data = await getTimeEntries(teamId, day - 86400000, dayEndMs)
+      const data = await getTimeEntries(teamId, rangeStart - 86400000, rangeEnd)
       setEntries(data || [])
     } catch {}
     onChange?.()
@@ -138,39 +177,88 @@ export default function Today({ teamId, currentEntry, refreshKey, onChange, onTa
     now
   )
   const dayTotal = cards.reduce((s, c) => s + c.total, 0)
+  const weekDays = allWeekDays.filter(wd => {
+    const dow = new Date(wd).getDay()
+    if (dow >= 1 && dow <= 5) return true
+    if (workdays.includes(dow)) return true
+    const end = wd + 86400000
+    return entries.some(e => { const st = parseInt(e.start); return st >= wd && st < end })
+  })
+  const offDays = weekDays.filter(wd => !workdays.includes(new Date(wd).getDay()))
+  const weekTotal = isWeek
+    ? entries.reduce((sum, e) => {
+        const st = parseInt(e.start)
+        if (st < weekStart || st > weekEndMs) return sum
+        const running = currentEntry?.id === e.id
+        return sum + (running ? now - st : Math.max(parseInt(e.duration || 0), 0))
+      }, 0)
+    : 0
 
   const dayLabel = offset === 0
     ? 'Today'
     : offset === 1
       ? 'Yesterday'
       : new Date(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+  const weekLabel = weekOffset === 0
+    ? 'This week'
+    : weekOffset === 1
+      ? 'Last week'
+      : `${formatDate(allWeekDays[0])} – ${formatDate(allWeekDays[6])}`
 
   return (
     <div className="today">
       <div className="today-header">
-        <div className="today-nav">
-          <button className="today-nav-btn" onClick={() => setOffset(o => o + 1)} title="Previous day">‹</button>
-          <button
-            className={`today-nav-label ${offset !== 0 ? 'today-nav-label-off' : ''}`}
-            onClick={() => setOffset(0)}
-            title={offset !== 0 ? 'Jump to today' : undefined}
-          >
-            {dayLabel}
-          </button>
-          <button
-            className="today-nav-btn"
-            onClick={() => setOffset(o => Math.max(0, o - 1))}
-            disabled={offset === 0}
-            title="Next day"
-          >›</button>
-        </div>
-        <div className="today-total">
-          <span className="today-total-label">total</span>
-          <span className="today-total-value">{formatDurationShort(dayTotal)}</span>
+        {isWeek ? (
+          <div className="today-nav">
+            <button className="today-nav-btn" onClick={() => setWeekOffset(o => o + 1)} title="Previous week">‹</button>
+            <button
+              className={`today-nav-label today-nav-label-wide ${weekOffset !== 0 ? 'today-nav-label-off' : ''}`}
+              onClick={() => setWeekOffset(0)}
+              title={weekOffset !== 0 ? 'Jump to this week' : undefined}
+            >
+              {weekLabel}
+            </button>
+            <button
+              className="today-nav-btn"
+              onClick={() => setWeekOffset(o => Math.max(0, o - 1))}
+              disabled={weekOffset === 0}
+              title="Next week"
+            >›</button>
+          </div>
+        ) : (
+          <div className="today-nav">
+            <button className="today-nav-btn" onClick={() => setOffset(o => o + 1)} title="Previous day">‹</button>
+            <button
+              className={`today-nav-label ${offset !== 0 ? 'today-nav-label-off' : ''}`}
+              onClick={() => setOffset(0)}
+              title={offset !== 0 ? 'Jump to today' : undefined}
+            >
+              {dayLabel}
+            </button>
+            <button
+              className="today-nav-btn"
+              onClick={() => setOffset(o => Math.max(0, o - 1))}
+              disabled={offset === 0}
+              title="Next day"
+            >›</button>
+          </div>
+        )}
+        <div className="today-header-right">
+          {wide && (
+            <div className="history-tabs today-view-switch">
+              <button className={`mini-tab ${!isWeek ? 'mini-tab-active' : ''}`} onClick={() => pickViewMode('day')}>Day</button>
+              <button className={`mini-tab ${isWeek ? 'mini-tab-active' : ''}`} onClick={() => pickViewMode('week')}>Week</button>
+            </div>
+          )}
+          <div className="today-total">
+            <span className="today-total-label">total</span>
+            <span className="today-total-value">{formatDurationShort(isWeek ? weekTotal : dayTotal)}</span>
+          </div>
         </div>
       </div>
 
       <div className={`today-body ${resizing ? 'today-body-resizing' : ''}`} ref={bodyRef}>
+        {!isWeek && (
         <div className="today-rail" style={{ width: railW }}>
           {!loading && cards.length === 0 && (
             <div className="today-rail-empty">
@@ -195,17 +283,25 @@ export default function Today({ teamId, currentEntry, refreshKey, onChange, onTa
             />
           ))}
         </div>
+        )}
+        {!isWeek && (
         <div
           className="today-divider"
           onMouseDown={handleDividerMouseDown}
           title="Drag to resize"
         />
+        )}
         <Timetable
           teamId={teamId}
-          day={day}
+          days={isWeek ? weekDays : [day]}
+          offDays={isWeek ? offDays : []}
+          onPickDay={isWeek ? (d => {
+            setOffset(Math.max(0, Math.round((startOfDay(new Date(now)) - d) / 86400000)))
+            pickViewMode('day')
+          }) : undefined}
           entries={entries}
           loading={loading}
-          currentEntry={offset === 0 ? currentEntry : null}
+          currentEntry={isWeek ? (weekOffset === 0 ? currentEntry : null) : (offset === 0 ? currentEntry : null)}
           onChange={reload}
           onTaskTracked={onTaskTracked}
           hoverKey={hoverKey}
