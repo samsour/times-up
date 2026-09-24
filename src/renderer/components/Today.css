@@ -266,6 +266,7 @@
 .entry-card-open {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   color: var(--text-muted);
   opacity: 0;
   transition: opacity 0.12s;

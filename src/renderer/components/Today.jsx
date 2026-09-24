@@ -336,6 +336,17 @@ function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, on
                     {card.listName}
                   </span>
                 )}
+                {card.task?.id && (
+                  <button
+                    className="entry-card-open"
+                    title="Open in ClickUp"
+                    onClick={() => window.api.shell.openExternal(`https://app.clickup.com/t/${card.task.id}`)}
+                  >
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                    </svg>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -370,26 +381,15 @@ function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, on
             )
           })}
         {!isUnassigned && card.task?.id && (
-          <>
-            <button
-              className="entry-card-open"
-              title="Open in ClickUp"
-              onClick={() => window.api.shell.openExternal(`https://app.clickup.com/t/${card.task.id}`)}
-            >
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
-              </svg>
-            </button>
-            <button
-              className="entry-card-open"
-              title="Change task"
-              onClick={() => setMode(mode === 'assign' ? null : 'assign')}
-            >
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-            </button>
-          </>
+          <button
+            className="entry-card-open"
+            title="Change task"
+            onClick={() => setMode(mode === 'assign' ? null : 'assign')}
+          >
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
         )}
       </div>
 
