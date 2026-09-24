@@ -461,15 +461,15 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
         </div>
         <div className="export-card">
           <div className="archive-hint">
-            Links to Toggl detailed CSV exports, one per line. Google Drive, Sheets and Dropbox
-            share links work as long as anyone with the link can view. Reports include these
-            entries alongside ClickUp.
+            A ClickUp task whose attachments are the Toggl detailed CSV exports. Paste the task
+            link; every CSV attached to it becomes part of the archive and shows up in Reports
+            alongside ClickUp. Direct links to CSV files work too, one per line.
           </div>
           <textarea
             className="archive-urls"
-            rows={3}
+            rows={2}
             spellCheck={false}
-            placeholder="https://drive.google.com/file/d/…/view"
+            placeholder="https://app.clickup.com/t/…"
             value={archiveUrls}
             onChange={e => handleArchiveUrls(e.target.value)}
           />
@@ -485,7 +485,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
                     </span>
                     {archiveStatus.files.filter(f => f.error).map(f => (
                       <span key={f.url} className="archive-status-line archive-status-error" title={f.url}>
-                        {shortUrl(f.url)}: {f.error}
+                        {f.label && !/^https?:/.test(f.label) ? f.label : shortUrl(f.url)}: {f.error}
                       </span>
                     ))}
                   </>

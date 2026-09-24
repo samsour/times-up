@@ -393,12 +393,49 @@ async function loadArchiveFile(url, force) {
   return { url, text: fs.readFileSync(file, 'utf8'), fetchedAt: meta.fetchedAt, error: null }
 }
 
+// A line in the archive setting is either a ClickUp task (link or id) whose
+// CSV attachments are the archive, or a direct link to a CSV
+function parseTaskRef(line) {
+  let m
+  if ((m = line.match(/app\.clickup\.com\/t\/(?:\d+\/)?([a-z0-9]+)/i))) return m[1]
+  if ((m = line.match(/^#?([a-z0-9]{6,})$/i)) && !/^https?:/i.test(line)) return m[1]
+  return null
+}
+
+async function expandArchiveSources(lines) {
+  const token = store.get('clickup_token')
+  const out = []
+  for (const line of lines) {
+    const taskId = parseTaskRef(line)
+    if (!taskId) {
+      if (/^https?:\/\//.test(line)) out.push({ url: line, label: line })
+      continue
+    }
+    try {
+      const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}`, { headers: { Authorization: token } })
+      if (!res.ok) throw new Error(`task ${taskId}: HTTP ${res.status}`)
+      const task = await res.json()
+      const csvs = (task.attachments || []).filter(a => /\.csv$/i.test(a.title || '') && a.url)
+      if (!csvs.length) out.push({ url: null, label: task.name, error: 'Task has no CSV attachments' })
+      for (const a of csvs) out.push({ url: a.url, label: a.title })
+    } catch (e) {
+      out.push({ url: null, label: line, error: e.message })
+    }
+  }
+  return out
+}
+
 ipcMain.handle('archive:load', async (_, { force = false } = {}) => {
-  const urls = String(store.get('archive_urls') || '')
+  const lines = String(store.get('archive_urls') || '')
     .split(/\s+/)
     .map(u => u.trim())
-    .filter(u => /^https?:\/\//.test(u))
-  return Promise.all(urls.map(u => loadArchiveFile(u, force)))
+    .filter(Boolean)
+  const sources = await expandArchiveSources(lines)
+  return Promise.all(sources.map(async src => {
+    if (!src.url) return { url: src.label, label: src.label, text: null, fetchedAt: null, error: src.error }
+    const r = await loadArchiveFile(src.url, force)
+    return { ...r, label: src.label }
+  }))
 })
 
 // The renderer reads the tray poll's cached timer instead of polling the

@@ -34,7 +34,7 @@ export async function loadArchive(force = false) {
           parseError = e.message
         }
       }
-      report.push({ url: f.url, fetchedAt: f.fetchedAt, error: f.error || parseError, count })
+      report.push({ url: f.url, label: f.label || f.url, fetchedAt: f.fetchedAt, error: f.error || parseError, count })
     }
     entries.sort((a, b) => a.start - b.start)
     cache = { entries, files: report, loadedAt: Date.now() }
