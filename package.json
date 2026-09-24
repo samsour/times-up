@@ -1,6 +1,6 @@
 {
   "name": "times-up",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Menu bar time tracker for ClickUp",
   "license": "MIT",
   "packageManager": "pnpm@11.4.0",
