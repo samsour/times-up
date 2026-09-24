@@ -16,7 +16,9 @@ contextBridge.exposeInMainWorld('api', {
     currentTimer: (force) => ipcRenderer.invoke('clickup:currentTimer', { force })
   },
   archive: {
-    load: (force) => ipcRenderer.invoke('archive:load', { force })
+    load: (force) => ipcRenderer.invoke('archive:load', { force }),
+    discover: () => ipcRenderer.invoke('archive:discover'),
+    createTask: (listId) => ipcRenderer.invoke('archive:createTask', { listId })
   },
   window: {
     hide: () => ipcRenderer.invoke('window:hide'),

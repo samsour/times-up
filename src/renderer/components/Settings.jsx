@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getTimeEntries, getUser } from '../lib/clickup.js'
+import { getTimeEntries, getUser, getAllLists } from '../lib/clickup.js'
 import { getGoals } from '../lib/goals.js'
 import { loadArchive, clearArchiveCache } from '../lib/archive.js'
 import { TONES, ACCENTS, loadAppearance, applyTone, applyAccent } from '../lib/theme.js'
@@ -65,6 +65,12 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [archiveUrls, setArchiveUrls] = useState('')
   const [archiveStatus, setArchiveStatus] = useState(null) // { files, entries }
   const [archiveLoading, setArchiveLoading] = useState(false)
+  const [archiveTasks, setArchiveTasks] = useState(null) // null = not looked up yet
+  const [archiveAdvanced, setArchiveAdvanced] = useState(false)
+  const [archiveLists, setArchiveLists] = useState([])
+  const [archiveListId, setArchiveListId] = useState('')
+  const [archiveCreating, setArchiveCreating] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
   const archiveSaveTimer = useRef(null)
 
   useEffect(() => {
@@ -88,16 +94,55 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
     window.api.updater.getState().then(setUpdateState)
     window.api.store.get('archive_urls').then(v => {
       setArchiveUrls(v || '')
-      if (v) refreshArchive(false)
+      if (v) setArchiveAdvanced(true)
     })
+    discoverArchive().then(found => { if (found || archiveUrls) refreshArchive(false) })
     const offUpdater = window.api.updater.onStateChange(setUpdateState)
     return () => { offUpdater(); offStore() }
   }, [])
 
+  // Finds tagged archive tasks; returns whether any exist
+  async function discoverArchive() {
+    try {
+      const tasks = await window.api.archive.discover()
+      setArchiveTasks(tasks)
+      setArchiveError('')
+      if (!tasks.length && !archiveLists.length) {
+        getAllLists(teamId).then(ls => {
+          setArchiveLists(ls || [])
+          // default to the planning list when there is one, it's already the app's home in ClickUp
+          window.api.store.get('planning_list_id').then(pid => {
+            setArchiveListId(pid && ls.some(l => String(l.id) === String(pid)) ? String(pid) : (ls[0] ? String(ls[0].id) : ''))
+          })
+        }).catch(() => {})
+      }
+      return tasks.length > 0
+    } catch (e) {
+      setArchiveTasks([])
+      setArchiveError(e.message)
+      return false
+    }
+  }
+
+  async function createArchiveTask() {
+    if (!archiveListId) return
+    setArchiveCreating(true)
+    setArchiveError('')
+    try {
+      const task = await window.api.archive.createTask(archiveListId)
+      await discoverArchive()
+      window.api.shell.openExternal(task.url || `https://app.clickup.com/t/${task.id}`)
+    } catch (e) {
+      setArchiveError(e.message)
+    } finally {
+      setArchiveCreating(false)
+    }
+  }
+
   async function refreshArchive(force) {
     setArchiveLoading(true)
     try {
-      if (force) clearArchiveCache()
+      if (force) { clearArchiveCache(); await discoverArchive() }
       const { files, entries } = await loadArchive(force)
       setArchiveStatus({ files, entries: entries.length })
     } catch (e) {
@@ -461,19 +506,62 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
         </div>
         <div className="export-card">
           <div className="archive-hint">
-            A ClickUp task whose attachments are the Toggl detailed CSV exports. Paste the task
-            link; every CSV attached to it becomes part of the archive and shows up in Reports
-            alongside ClickUp. Direct links to CSV files work too, one per line.
+            Old time entries live as CSV attachments on a ClickUp task tagged{' '}
+            <code className="archive-tag">timesup-archive</code>. Everyone who can see that task
+            gets the archive in Reports, nothing to configure.
           </div>
-          <textarea
-            className="archive-urls"
-            rows={2}
-            spellCheck={false}
-            placeholder="https://app.clickup.com/t/…"
-            value={archiveUrls}
-            onChange={e => handleArchiveUrls(e.target.value)}
-          />
-          {archiveUrls.trim() && (
+
+          {archiveTasks === null && <span className="archive-status-line">Looking for archive tasks…</span>}
+
+          {archiveTasks && archiveTasks.length > 0 && (
+            <div className="archive-tasks">
+              {archiveTasks.map(t => (
+                <div key={t.id} className="archive-task">
+                  <div className="archive-task-main">
+                    <span className="archive-task-name" title={t.name}>{t.name}</span>
+                    <span className="archive-task-meta">
+                      {t.listName ? `${t.listName} · ` : ''}{t.csvCount} {t.csvCount === 1 ? 'CSV' : 'CSVs'}
+                    </span>
+                  </div>
+                  <button
+                    className="entry-card-open archive-task-open"
+                    title="Open in ClickUp"
+                    onClick={() => window.api.shell.openExternal(t.url || `https://app.clickup.com/t/${t.id}`)}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {archiveTasks && archiveTasks.length === 0 && !archiveError && (
+            <div className="archive-create">
+              <span className="archive-status-line">No archive task yet. Create one, then attach the CSV exports to it.</span>
+              <div className="archive-create-row">
+                <select
+                  className="draft-input archive-list-select"
+                  value={archiveListId}
+                  onChange={e => setArchiveListId(e.target.value)}
+                  disabled={!archiveLists.length}
+                >
+                  {!archiveLists.length && <option value="">Loading lists…</option>}
+                  {archiveLists.map(l => (
+                    <option key={l.id} value={String(l.id)}>{l.path} / {l.name}</option>
+                  ))}
+                </select>
+                <button className="settings-update-btn" disabled={archiveCreating || !archiveListId} onClick={createArchiveTask}>
+                  {archiveCreating ? '…' : 'Create task'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {archiveError && <span className="archive-status-line archive-status-error">{archiveError}</span>}
+
+          {(archiveTasks?.length > 0 || archiveUrls.trim()) && (
             <div className="archive-status">
               <div className="archive-status-lines">
                 {archiveLoading && <span className="archive-status-line">Loading…</span>}
@@ -495,6 +583,20 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
                 Refresh
               </button>
             </div>
+          )}
+
+          <button className="archive-advanced-toggle" onClick={() => setArchiveAdvanced(v => !v)}>
+            {archiveAdvanced ? 'Hide' : 'Advanced'}: direct CSV links
+          </button>
+          {archiveAdvanced && (
+            <textarea
+              className="archive-urls"
+              rows={2}
+              spellCheck={false}
+              placeholder="https://…/export.csv or a ClickUp task link, one per line"
+              value={archiveUrls}
+              onChange={e => handleArchiveUrls(e.target.value)}
+            />
           )}
         </div>
       </div>

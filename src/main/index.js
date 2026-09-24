@@ -425,12 +425,72 @@ async function expandArchiveSources(lines) {
   return out
 }
 
+// Archive tasks are found by tag, workspace-wide, so nobody has to paste a
+// link: every task tagged like this that the user can see is a source.
+const ARCHIVE_TAG = 'timesup-archive'
+
+async function discoverArchiveTasks() {
+  const token = store.get('clickup_token')
+  const teamId = store.get('team_id')
+  if (!token || !teamId) return []
+  const params = new URLSearchParams({ include_closed: 'true', subtasks: 'true' })
+  params.append('tags[]', ARCHIVE_TAG)
+  const res = await fetch(`https://api.clickup.com/api/v2/team/${teamId}/task?${params}`, { headers: { Authorization: token } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const { tasks } = await res.json()
+  return (tasks || []).map(t => ({ id: t.id, name: t.name, url: t.url, listName: t.list?.name }))
+}
+
+ipcMain.handle('archive:discover', async () => {
+  const tasks = await discoverArchiveTasks()
+  // attachment counts need the task detail
+  const token = store.get('clickup_token')
+  return Promise.all(tasks.map(async t => {
+    try {
+      const res = await fetch(`https://api.clickup.com/api/v2/task/${t.id}`, { headers: { Authorization: token } })
+      const task = await res.json()
+      const csvCount = (task.attachments || []).filter(a => /\.csv$/i.test(a.title || '')).length
+      return { ...t, csvCount }
+    } catch {
+      return { ...t, csvCount: 0 }
+    }
+  }))
+})
+
+ipcMain.handle('archive:createTask', async (_, { listId }) => {
+  const token = store.get('clickup_token')
+  const res = await fetch(`https://api.clickup.com/api/v2/list/${listId}/task`, {
+    method: 'POST',
+    headers: { Authorization: token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'TimesUp · Time tracking archive',
+      tags: [ARCHIVE_TAG],
+      description:
+        'Managed by TimesUp. Attach Toggl "detailed report" CSV exports to this task; ' +
+        'TimesUp reads every CSV attached here into its Reports. ' +
+        'The tag marks the task as an archive source, keep it.',
+    }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.err || `HTTP ${res.status}`)
+  structureCache.clear()
+  return { id: data.id, name: data.name, url: data.url }
+})
+
 ipcMain.handle('archive:load', async (_, { force = false } = {}) => {
   const lines = String(store.get('archive_urls') || '')
     .split(/\s+/)
     .map(u => u.trim())
     .filter(Boolean)
-  const sources = await expandArchiveSources(lines)
+  let discovered = []
+  try { discovered = await discoverArchiveTasks() } catch (e) { discovered = [{ id: null, name: 'Archive lookup', error: e.message }] }
+  const manual = await expandArchiveSources(lines)
+  const tagged = await expandArchiveSources(discovered.filter(t => t.id).map(t => t.id))
+  const sources = [
+    ...discovered.filter(t => !t.id).map(t => ({ url: null, label: t.name, error: t.error })),
+    ...tagged,
+    ...manual.filter(m => !tagged.some(t => t.url === m.url)),
+  ]
   return Promise.all(sources.map(async src => {
     if (!src.url) return { url: src.label, label: src.label, text: null, fetchedAt: null, error: src.error }
     const r = await loadArchiveFile(src.url, force)

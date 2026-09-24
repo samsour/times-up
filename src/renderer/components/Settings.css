@@ -434,3 +434,84 @@
   border-color: var(--bg);
   box-shadow: 0 0 0 2px var(--text);
 }
+
+.archive-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.archive-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.archive-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.archive-task-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.archive-task-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-task-meta {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.archive-task-open {
+  opacity: 1;
+  flex-shrink: 0;
+}
+
+.archive-create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.archive-create-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.archive-list-select {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.archive-advanced-toggle {
+  align-self: flex-start;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.archive-advanced-toggle:hover {
+  color: var(--text);
+}
