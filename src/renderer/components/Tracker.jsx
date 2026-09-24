@@ -17,7 +17,7 @@ const WINDOW_KIND = new URLSearchParams(window.location.search).get('win') === '
 const isPopover = WINDOW_KIND === 'popover'
 
 // Views that need room and a window that survives clicking elsewhere
-const WINDOW_ONLY_VIEWS = ['plan']
+const WINDOW_ONLY_VIEWS = ['plan', 'settings']
 
 export default function Tracker({ teamId, userId, theme, onThemeChange, font, onFontChange, onReset }) {
   const [view, setViewState] = useState('today') // 'today' | 'stats' | 'plan' | 'settings'
