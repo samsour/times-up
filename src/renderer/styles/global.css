@@ -202,3 +202,13 @@ input, textarea {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Pomodoro phase tint ─────────────────────────────────────────────── */
+[data-pomo="ready"] { --pomo: var(--text-muted); }
+[data-pomo="focus"] { --pomo: var(--accent); }
+[data-pomo="break"] { --pomo: var(--success); }
+
+[data-pomo] .tracker {
+  background: color-mix(in srgb, var(--pomo) 7%, var(--bg));
+  transition: background 0.5s ease;
+}

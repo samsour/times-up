@@ -520,3 +520,12 @@
 .archive-advanced-toggle:hover {
   color: var(--text);
 }
+
+/* Indented rows that belong to the toggle above them */
+.settings-row-sub {
+  padding-left: 14px;
+}
+
+.settings-row-sub .settings-row-title {
+  color: var(--text-dim);
+}

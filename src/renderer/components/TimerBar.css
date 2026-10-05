@@ -281,3 +281,72 @@
 .timer-bar-progress-done {
   background: var(--success);
 }
+
+/* pomodoro (compact; the full surface is the Focus view) */
+
+.timer-bar-time-pomo {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.timer-bar-time-pomo:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.timer-bar-pomo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  transition: all 0.12s;
+}
+
+.timer-bar-pomo:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.timer-bar-pomo-on {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.timer-bar-break {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.timer-bar-break-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-bar-break-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
+
+.timer-bar-break-btn:hover {
+  color: var(--text);
+  background: var(--accent-dim);
+}

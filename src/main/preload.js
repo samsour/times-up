@@ -45,6 +45,18 @@ contextBridge.exposeInMainWorld('api', {
     },
     dismiss: () => ipcRenderer.invoke('idle:dismiss')
   },
+  pomo: {
+    getState: () => ipcRenderer.invoke('pomo:getState'),
+    skip: () => ipcRenderer.invoke('pomo:skip'),
+    startBreak: (kind) => ipcRenderer.invoke('pomo:startBreak', kind),
+    extend: (minutes) => ipcRenderer.invoke('pomo:extend', minutes),
+    resetCycle: () => ipcRenderer.invoke('pomo:resetCycle'),
+    onState: (cb) => {
+      const handler = (_, state) => cb(state)
+      ipcRenderer.on('pomo:state', handler)
+      return () => ipcRenderer.removeListener('pomo:state', handler)
+    }
+  },
   updater: {
     getState: () => ipcRenderer.invoke('update:getState'),
     getVersions: () => ipcRenderer.invoke('update:getVersions'),

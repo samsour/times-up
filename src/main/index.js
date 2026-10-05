@@ -1,4 +1,5 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, shell, powerMonitor } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen, shell, powerMonitor, Notification } from 'electron'
+import { createPomodoro } from './pomodoro.js'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Store from 'electron-store'
@@ -177,9 +178,38 @@ async function syncTimer() {
     activeTimer = data
       ? { start: parseInt(data.start), label: (data.task?.name || data.description || '').slice(0, 30) }
       : null
+    pomodoro.observeTimer(currentEntry)
   } catch {}
   updateTrayTitle()
 }
+
+// Pomodoro mode rides on the tray poll: every running entry is a focus
+// block, and the block's end stops the entry through the API from here
+function notify(title, body) {
+  if (!Notification.isSupported()) return
+  const n = new Notification({ title, body })
+  n.on('click', () => {
+    if (store.get('open_as_window')) openStandaloneWindow()
+    else toggleWindow()
+  })
+  n.show()
+}
+
+const pomodoro = createPomodoro({
+  store,
+  notify,
+  emit: state => broadcast('pomo:state', state),
+  log: isDev ? console.log : null,
+  api: {
+    stopTimer: () => clickupFetch(store.get('clickup_token'), 'POST', `/team/${store.get('team_id')}/time_entries/stop`),
+    startTimer: (taskId, description) => {
+      const body = { description: description || '' }
+      if (taskId) body.tid = taskId
+      return clickupFetch(store.get('clickup_token'), 'POST', `/team/${store.get('team_id')}/time_entries/start`, body)
+    },
+    sync: () => syncTimerOnce(),
+  },
+})
 
 let lastTimerSync = 0
 
@@ -213,7 +243,10 @@ function pollTimerIfDue() {
 
 function updateTrayTitle() {
   if (!tray) return
-  if (activeTimer) {
+  const pomoTitle = pomodoro.trayTitle()
+  if (pomoTitle) {
+    tray.setTitle(pomoTitle)
+  } else if (activeTimer) {
     const sec = Math.floor((Date.now() - activeTimer.start) / 1000)
     const h = Math.floor(sec / 3600).toString()
     const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0')
@@ -242,6 +275,12 @@ function createTray() {
   syncTimerOnce()
   setInterval(updateTrayTitle, 10_000)
   setInterval(pollTimerIfDue, 10_000)
+  // A countdown wants seconds; only while a block or break is running
+  setInterval(() => {
+    if (!pomodoro.active()) return
+    pomodoro.tick()
+    updateTrayTitle()
+  }, 1_000)
   // Catch up right away after sleep or a locked screen instead of waiting
   // for the next slow interval
   powerMonitor.on('resume', syncTimerOnce)
@@ -285,6 +324,9 @@ ipcMain.handle('store:get', (_, key) => store.get(key))
 ipcMain.handle('store:set', (_, key, value) => {
   store.set(key, value)
   broadcast('store:changed', { key, value })
+  // Mode toggled: re-evaluate the running entry and tell the windows even
+  // when that changes no phase (e.g. nothing is running)
+  if (key === 'pomodoro_mode') { pomodoro.observeTimer(currentEntry); pomodoro.publish(); updateTrayTitle() }
 })
 ipcMain.handle('store:delete', (_, key) => {
   store.delete(key)
@@ -554,11 +596,18 @@ ipcMain.handle('app:setLoginItemSettings', (_, openAtLogin) => {
 })
 ipcMain.handle('idle:dismiss', () => { idlePromptShown = false })
 
+ipcMain.handle('pomo:getState', () => pomodoro.snapshot())
+ipcMain.handle('pomo:skip', () => pomodoro.skip())
+ipcMain.handle('pomo:startBreak', (_, kind) => pomodoro.startBreak(kind))
+ipcMain.handle('pomo:extend', (_, minutes) => pomodoro.extend(minutes))
+ipcMain.handle('pomo:resetCycle', () => pomodoro.resetCycle())
+
 let idlePromptShown = false
 setInterval(() => {
   if (!win || idlePromptShown) return
   const enabled = store.get('idleDetection')
   if (!enabled) return
+  if (pomodoro.inBreak()) return // being away is the point of a break
   const thresholdMins = store.get('idleThreshold') || 5
   const idleSeconds = powerMonitor.getSystemIdleTime()
   if (idleSeconds >= thresholdMins * 60) {

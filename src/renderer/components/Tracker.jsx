@@ -7,6 +7,7 @@ import Reports from './Reports.jsx'
 import Settings from './Settings.jsx'
 import IdlePrompt from './IdlePrompt.jsx'
 import Planning from './Planning.jsx'
+import Focus from './Focus.jsx'
 import { getCurrentTimer, startTimer, updateTimeEntry, advanceTaskStatus, updateTask, getTeamMembers, canViewOthersTime } from '../lib/clickup.js'
 import './Tracker.css'
 
@@ -28,6 +29,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   const [pickerOpen, setPickerOpen] = useState(false)
   const [toast, setToast] = useState(null) // { text, undo }
   const [isAdmin, setIsAdmin] = useState(false)
+  const [pomo, setPomo] = useState(null)
   const toastTimer = useRef(null)
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
       return
     }
     setViewState(resolved)
-    if (!isPopover && resolved !== 'settings') window.api.store.set('window_view', resolved)
+    if (!isPopover && resolved !== 'settings' && resolved !== 'focus') window.api.store.set('window_view', resolved)
   }
 
   const refreshCurrent = useCallback(async (force = false) => {
@@ -82,6 +84,40 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
       setIdleSeconds(seconds)
     })
   }, [])
+
+  // Pomodoro phases come from the main process; a phase change usually
+  // means it started or stopped the ClickUp timer, so refresh right away
+  useEffect(() => {
+    window.api.pomo.getState().then(setPomo)
+    const offState = window.api.pomo.onState(state => {
+      setPomo(state)
+      refreshCurrent(true)
+      setRefreshKey(k => k + 1)
+    })
+    const offStore = window.api.store.onChange(({ key }) => {
+      if (key === 'pomodoro_mode') window.api.pomo.getState().then(setPomo)
+    })
+    return () => { offState(); offStore() }
+  }, [refreshCurrent])
+
+  // Pomodoro mode has its own surface: switch to it when the mode comes
+  // on, leave it when the mode goes off
+  const pomoEnabledRef = useRef(null)
+  useEffect(() => {
+    if (!pomo) return
+    const was = pomoEnabledRef.current
+    pomoEnabledRef.current = pomo.enabled
+    if (pomo.enabled && was === false) setViewState('focus')
+    if (!pomo.enabled && view === 'focus') setViewState('today')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pomo?.enabled])
+
+  // The window tints with the phase, like a Pomodoro timer does
+  useEffect(() => {
+    const root = document.documentElement
+    if (!pomo?.enabled) { delete root.dataset.pomo; return }
+    root.dataset.pomo = pomo.phase === 'focus' && currentEntry ? 'focus' : pomo.phase ? 'break' : 'ready'
+  }, [pomo, currentEntry])
 
   useEffect(() => {
     return window.api.updater.onStateChange((state) => {
@@ -141,6 +177,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
     <div className="tracker">
       <header className="tracker-header">
         <div className="tracker-tabs">
+          {pomo?.enabled && <TabBtn active={view === 'focus'} onClick={() => setView('focus')}>Focus</TabBtn>}
           <TabBtn active={view === 'today'} onClick={() => setView('today')}>Today</TabBtn>
           <TabBtn active={view === 'stats'} onClick={() => setView('stats')}>Stats</TabBtn>
           {isAdmin && <TabBtn active={view === 'plan'} onClick={() => setView('plan')}>Plan</TabBtn>}
@@ -170,16 +207,32 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
         </div>
       </header>
 
-      <TimerBar
-        teamId={teamId}
-        userId={userId}
-        currentEntry={currentEntry}
-        onBrowse={() => setPickerOpen(true)}
-        onChange={bumpRefresh}
-        onTaskTracked={handleTaskTracked}
-      />
+      {view !== 'focus' && (
+        <TimerBar
+          teamId={teamId}
+          userId={userId}
+          currentEntry={currentEntry}
+          pomo={pomo}
+          onBrowse={() => setPickerOpen(true)}
+          onChange={bumpRefresh}
+          onTaskTracked={handleTaskTracked}
+          onOpenFocus={() => setView('focus')}
+        />
+      )}
 
       <main className="tracker-body" style={{ position: 'relative' }}>
+        {view === 'focus' && (
+          <Focus
+            teamId={teamId}
+            userId={userId}
+            currentEntry={currentEntry}
+            pomo={pomo}
+            refreshKey={refreshKey}
+            onChange={bumpRefresh}
+            onTaskTracked={handleTaskTracked}
+            onExit={() => window.api.store.set('pomodoro_mode', false)}
+          />
+        )}
         {view === 'today' && (
           <Today
             teamId={teamId}

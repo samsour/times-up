@@ -13,8 +13,9 @@ import './TimerBar.css'
 
 // Compact always-visible timer strip: start/stop, elapsed, task switch,
 // start-time edit and the daily goal as a hairline progress bar.
-export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onChange, onTaskTracked }) {
+export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse, onChange, onTaskTracked, onOpenFocus }) {
   const [elapsed, setElapsed] = useState(0)
+  const [pomoLeft, setPomoLeft] = useState(0)
   const [busy, setBusy] = useState(false)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -44,6 +45,24 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
     const interval = setInterval(update, 1000)
     return () => clearInterval(interval)
   }, [isRunning, currentEntry])
+
+  // Countdown of the current block or break, ticking locally from endsAt
+  const pomoEndsAt = pomo?.endsAt || null
+  useEffect(() => {
+    if (!pomoEndsAt) { setPomoLeft(0); return }
+    const update = () => setPomoLeft(Math.max(0, pomoEndsAt - Date.now()))
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [pomoEndsAt])
+
+  const pomoOn = !!pomo?.enabled
+  const inFocus = pomoOn && pomo.phase === 'focus' && isRunning
+  const inBreak = pomoOn && (pomo.phase === 'short' || pomo.phase === 'long')
+
+  function togglePomodoro() {
+    window.api.store.set('pomodoro_mode', !pomoOn)
+  }
 
   useEffect(() => {
     getGoals().then(g => setCapacity(g.dailyMs))
@@ -83,7 +102,8 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
   async function startUnassigned(desc) {
     setBusy(true)
     try {
-      await startTimer(teamId, null, desc)
+      // A bare Start in Pomodoro mode still needs something to show in ClickUp
+      await startTimer(teamId, null, desc || (pomoOn ? 'Pomodoro' : ''))
       setQuery('')
       setOpen(false)
       onChange()
@@ -218,17 +238,29 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
           )}
         </button>
 
-        {isRunning && (
+        {isRunning && !inFocus && (
           <span className="timer-bar-time">{formatDuration(elapsed)}</span>
+        )}
+        {inFocus && (
+          <button className="timer-bar-time timer-bar-time-pomo" onClick={onOpenFocus} title={`Block ends in ${formatDuration(pomoLeft)} · ${formatDuration(elapsed)} tracked. Open Focus`}>
+            {formatDuration(pomoLeft)}
+          </button>
         )}
 
         <div className="timer-bar-middle">
-          {showSearchInput ? (
+          {inBreak ? (
+            <div className="timer-bar-break">
+              <span className="timer-bar-break-label">
+                {pomo.phase === 'long' ? 'Long break' : 'Short break'} · {formatDuration(pomoLeft)}
+              </span>
+              <button className="timer-bar-break-btn" onClick={() => window.api.pomo.skip()} title={isRunning ? 'End the break and start the next block' : 'End the break now'}>Skip</button>
+            </div>
+          ) : showSearchInput ? (
             <>
               <input
                 ref={inputRef}
                 className="timer-bar-input"
-                placeholder={isRunning ? (runningTask ? 'Switch task…' : 'Assign a task…') : 'Start a task or note…'}
+                placeholder={isRunning ? (runningTask ? 'Switch task…' : 'Assign a task…') : pomoOn ? 'What will you focus on?' : 'Start a task or note…'}
                 value={query}
                 onChange={e => { setQuery(e.target.value); setHighlight(0) }}
                 onFocus={() => setOpen(true)}
@@ -325,7 +357,7 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
           )}
         </div>
 
-        {isRunning && (
+        {isRunning && !inFocus && (
           editingStart ? (
             <div className="timer-bar-since-edit">
               <input
@@ -348,6 +380,17 @@ export default function TimerBar({ teamId, userId, currentEntry, onBrowse, onCha
             </button>
           )
         )}
+
+        <button
+          className={`timer-bar-pomo ${pomoOn ? 'timer-bar-pomo-on' : ''}`}
+          onClick={pomoOn ? onOpenFocus : togglePomodoro}
+          title={pomoOn ? 'Open Focus' : 'Pomodoro mode: timed focus blocks with breaks'}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="13" r="8" />
+            <path d="M12 9v4l2.5 2.5M9 3h6" />
+          </svg>
+        </button>
       </div>
 
       {capacity > 0 && (

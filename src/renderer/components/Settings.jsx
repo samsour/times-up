@@ -54,6 +54,8 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [accent, setAccent] = useState('coral')
   const [idleDetection, setIdleDetection] = useState(false)
   const [snapToGrid, setSnapToGrid] = useState(false)
+  const [pomoMode, setPomoMode] = useState(false)
+  const [pomoCfg, setPomoCfg] = useState({ focus: 25, short: 5, long: 15, every: 4, autoNext: false, trackBreaks: true })
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
   const [weeklyGoalHours, setWeeklyGoalHours] = useState('')
@@ -88,10 +90,17 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       if (key === 'accent') setAccent(value || 'coral')
       if (key === 'open_as_window') setOpenAsWindow(!!value)
       if (key === 'snap_to_grid') setSnapToGrid(!!value)
+      if (key === 'pomodoro_mode') setPomoMode(!!value)
       if (key === 'archive_urls') setArchiveUrls(value || '')
     })
     window.api.store.get('idleDetection').then(v => setIdleDetection(!!v))
     window.api.store.get('snap_to_grid').then(v => setSnapToGrid(!!v))
+    window.api.store.get('pomodoro_mode').then(v => setPomoMode(!!v))
+    Promise.all(['pomo_focus', 'pomo_short', 'pomo_long', 'pomo_every', 'pomo_auto_next', 'pomo_track_breaks'].map(k => window.api.store.get(k)))
+      .then(([focus, short, long, every, autoNext, trackBreaks]) => setPomoCfg(c => ({
+        focus: focus || c.focus, short: short || c.short, long: long || c.long, every: every || c.every,
+        autoNext: !!autoNext, trackBreaks: trackBreaks !== false,
+      })))
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
     getGoals().then(g => {
@@ -418,6 +427,99 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
             <span className="settings-toggle-knob" />
           </button>
         </div>
+        <div className="settings-row">
+          <span className="settings-row-title" title="Every timer becomes a timed focus block; when it ends the entry is stopped and a break starts. Breaks are not tracked">
+            Pomodoro mode
+          </span>
+          <button
+            className={`settings-toggle ${pomoMode ? 'settings-toggle-on' : ''}`}
+            onClick={async () => {
+              const next = !pomoMode
+              setPomoMode(next)
+              await window.api.store.set('pomodoro_mode', next)
+            }}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
+        </div>
+        {pomoMode && (
+          <>
+            {[
+              { key: 'pomo_focus', field: 'focus', label: 'Focus block', max: 180 },
+              { key: 'pomo_short', field: 'short', label: 'Short break', max: 60 },
+              { key: 'pomo_long', field: 'long', label: 'Long break', max: 120 },
+            ].map(({ key, field, label, max }) => (
+              <div className="settings-row settings-row-sub" key={key}>
+                <span className="settings-row-title">{label}</span>
+                <div className="settings-number-row">
+                  <input
+                    className="settings-number"
+                    type="number"
+                    min="1"
+                    max={max}
+                    value={pomoCfg[field]}
+                    onChange={e => {
+                      const v = Math.min(max, Math.max(1, parseInt(e.target.value) || 1))
+                      setPomoCfg(c => ({ ...c, [field]: v }))
+                      window.api.store.set(key, v)
+                    }}
+                  />
+                  <span className="settings-number-unit">min</span>
+                </div>
+              </div>
+            ))}
+            <div className="settings-row settings-row-sub">
+              <span className="settings-row-title">Long break after</span>
+              <div className="settings-number-row">
+                <input
+                  className="settings-number"
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={pomoCfg.every}
+                  onChange={e => {
+                    const v = Math.min(12, Math.max(1, parseInt(e.target.value) || 1))
+                    setPomoCfg(c => ({ ...c, every: v }))
+                    window.api.store.set('pomo_every', v)
+                  }}
+                />
+                <span className="settings-number-unit">blocks</span>
+              </div>
+            </div>
+            <div className="settings-row settings-row-sub">
+              <span className="settings-row-title" title="Breaks are part of the work: the timer keeps running through them on the same entry, and the next block starts when the break ends. Off: the entry is stopped when a block ends and breaks are untracked">
+                Track breaks
+              </span>
+              <button
+                className={`settings-toggle ${pomoCfg.trackBreaks ? 'settings-toggle-on' : ''}`}
+                onClick={async () => {
+                  const next = !pomoCfg.trackBreaks
+                  setPomoCfg(c => ({ ...c, trackBreaks: next }))
+                  await window.api.store.set('pomo_track_breaks', next)
+                }}
+              >
+                <span className="settings-toggle-knob" />
+              </button>
+            </div>
+            {!pomoCfg.trackBreaks && (
+              <div className="settings-row settings-row-sub">
+                <span className="settings-row-title" title="When a break ends, start a new entry on the same task without asking">
+                  Auto-start next block
+                </span>
+                <button
+                  className={`settings-toggle ${pomoCfg.autoNext ? 'settings-toggle-on' : ''}`}
+                  onClick={async () => {
+                    const next = !pomoCfg.autoNext
+                    setPomoCfg(c => ({ ...c, autoNext: next }))
+                    await window.api.store.set('pomo_auto_next', next)
+                  }}
+                >
+                  <span className="settings-toggle-knob" />
+                </button>
+              </div>
+            )}
+          </>
+        )}
         <div className="settings-row">
           <span className="settings-row-title" title="Days you normally work — your average divides by these; time tracked on other days only adds on top">
             Working days
