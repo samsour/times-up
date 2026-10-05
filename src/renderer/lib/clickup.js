@@ -202,17 +202,25 @@ export async function getCurrentTimer(teamId, force = false) {
   }
 }
 
+// ClickUp only returns entries that lie entirely inside the window: start at
+// or after start_date AND end before end_date (verified against the API). An
+// entry that starts Saturday evening and stops Sunday afternoon is therefore
+// missing from a plain Saturday query. We widen end_date and keep the
+// caller's meaning, "entries that started in the range", by filtering here.
+const END_PAD_MS = 2 * 24 * 3600000;
+
 export async function getTimeEntries(teamId, startDate, endDate, assignees) {
   const params = new URLSearchParams();
   if (startDate) params.set("start_date", startDate);
-  if (endDate) params.set("end_date", endDate);
+  if (endDate) params.set("end_date", endDate + END_PAD_MS);
   params.set("include_location_names", "true");
   // Requires workspace owner/admin to see entries other than your own
   if (assignees && assignees.length) params.set("assignee", assignees.join(","));
   const { data } = await api().request({
     path: `/team/${teamId}/time_entries?${params.toString()}`,
   });
-  return data;
+  if (!endDate) return data;
+  return (data || []).filter(e => parseInt(e.start) <= endDate);
 }
 
 export async function createTimeEntry(

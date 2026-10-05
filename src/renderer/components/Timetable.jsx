@@ -15,6 +15,13 @@ function snap(ms, step = SNAP_MS) {
   return Math.round(ms / step) * step
 }
 
+// Calendar-day arithmetic that survives DST changes
+function addDays(dayStart, n) {
+  const d = new Date(dayStart)
+  d.setDate(d.getDate() + n)
+  return startOfDay(d)
+}
+
 // Zoom steps: pixels per hour and the grid the timetable snaps to. The
 // large step earns a finer grid, short entries are placeable there.
 const ZOOM_LEVELS = [
@@ -224,10 +231,12 @@ export default function Timetable({
       ? snapT(Date.now() + snapMs - 1)
       : snapT(start + Math.max(parseInt(entry.duration || 0), 0))
     if (snappedEnd <= snappedStart) snappedEnd = snappedStart + snapMs
+    // `day` is the column the popup sits in; an overnight entry can be opened
+    // from its continuation, so start and end carry their own dates
     resetDraft()
     setEditing({ entry, running, day: entryDay })
     setEditStart(snappedStart)
-    setEditEnd(Math.min(snappedEnd, entryDay + DAY_MS))
+    setEditEnd(snappedEnd)
     setEditTaskText(entry.task?.name || '')
     setEditTaskPicked(null)
     setEditTaskResults(null)
@@ -522,8 +531,11 @@ export default function Timetable({
   rangeStartOffRef.current = minOff
   geomRef.current = { minOff, dayW }
 
+  // Hour boundaries, first to last; the canvas spans exactly those hours so
+  // the last line (midnight at most) is the bottom edge, not another hour
   const hours = []
   for (let off = minOff; off <= maxOff; off += HOUR_MS) hours.push(off)
+  const gridH = (hours.length - 1) * pxPerHour
 
   const offToY = (off) => ((off - minOff) / HOUR_MS) * pxPerHour
 
@@ -574,7 +586,7 @@ export default function Timetable({
         <div
           className={innerClass}
           ref={innerRef}
-          style={{ height: hours.length * pxPerHour }}
+          style={{ height: gridH }}
           onMouseDown={handleInnerMouseDown}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -683,11 +695,11 @@ export default function Timetable({
                   }}
                   title={!isDragging
                     ? cont
-                      ? `${label} · started the day before ${formatTime(realStart)} · ${formatDurationShort(totalDuration)} total (counts for that day)`
+                      ? `${label} · started the day before ${formatTime(realStart)} · ${formatDurationShort(totalDuration)} total (counts for that day) · click to edit`
                       : `${label} · ${formatDurationShort(duration)}`
                     : undefined}
                   onMouseDown={!isRunning && !cont ? e => handleBlockMouseDown(e, entry, 'move', d) : e => e.stopPropagation()}
-                  onClick={isRunning ? () => openEditor(entry, d) : undefined}
+                  onClick={isRunning || cont ? () => openEditor(entry, d) : undefined}
                   onMouseEnter={() => { setHoveredBlockId(entry.id); onHoverBlock?.(blockKey(entry)) }}
                   onMouseLeave={() => { setHoveredBlockId(null); onHoverBlock?.(null) }}
                 >
@@ -719,10 +731,11 @@ export default function Timetable({
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                     </button>
                   )}
-                  {!isRunning && !cont && (
+                  {!isRunning && (
                     <div
                       className="timetable-block-resize-handle"
                       onMouseDown={e => { e.stopPropagation(); handleBlockMouseDown(e, entry, 'resize', d) }}
+                      onClick={e => e.stopPropagation()}
                     />
                   )}
                 </div>
@@ -830,18 +843,35 @@ export default function Timetable({
 
           {editing && (() => {
             const eday = editing.day
-            const totalH = hours.length * pxPerHour
+            const totalH = gridH
             const top = Math.max(Math.min(offToY(editStart - eday), totalH - 200), 0)
+            const startDay = startOfDay(editStart)
+            const endDay = startOfDay(editEnd)
+            // Start can be any day from two weeks before the entry up to
+            // today; the end stays within two days of the start, which is as
+            // far as the entry fetch looks ahead
+            const startDays = []
+            for (let d = addDays(Math.min(startDay, todayStart), -14); d <= Math.max(startDay, todayStart); d = addDays(d, 1)) startDays.push(d)
+            const endDays = []
+            for (let d = startDay; d <= Math.max(addDays(startDay, 2), endDay); d = addDays(d, 1)) endDays.push(d)
             // Running: start can be anything up to now (inclusive, so a
             // just-started timer's snapped start is still in the list)
             const startMax = editing.running
-              ? Math.min(Math.max(snapT(Date.now()), editStart), eday + DAY_MS - snapMs)
-              : eday + DAY_MS - snapMs
+              ? Math.min(Math.max(snapT(Date.now()), editStart), startDay + DAY_MS - snapMs)
+              : startDay + DAY_MS - snapMs
             const startOpts = []
-            for (let t = eday; t <= startMax; t += snapMs) startOpts.push(t)
+            for (let t = startDay; t <= startMax; t += snapMs) startOpts.push(t)
             if (!startOpts.includes(editStart)) startOpts.push(editStart), startOpts.sort((a, b) => a - b)
             const endOpts = []
-            for (let t = editStart + snapMs; t <= eday + DAY_MS; t += snapMs) endOpts.push(t)
+            for (let t = Math.max(endDay, editStart + snapMs); t <= endDay + DAY_MS; t += snapMs) endOpts.push(t)
+            if (!endOpts.includes(editEnd)) endOpts.push(editEnd), endOpts.sort((a, b) => a - b)
+            const dayLabel = d => new Date(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+            // Moving the start day keeps the time of day and, unless running, the duration
+            const moveStart = newStart => {
+              const duration = editEnd - editStart
+              setEditStart(newStart)
+              if (!editing.running) setEditEnd(newStart + duration)
+            }
             return (
               <div
                 className="timetable-draft-form timetable-edit-form"
@@ -852,15 +882,36 @@ export default function Timetable({
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>
                 <div className="edit-times">
+                  {/* Days read as plain text; clicking one opens its picker */}
+                  <select
+                    className="edit-day"
+                    value={startDay}
+                    title="Change the start day"
+                    onChange={e => moveStart(Number(e.target.value) + (editStart - startDay))}
+                  >
+                    {startDays.map(d => <option key={d} value={d}>{dayLabel(d)}</option>)}
+                  </select>
+                  <span />
+                  {editing.running ? (
+                    <span className="edit-day edit-day-static">{dayLabel(todayStart)}</span>
+                  ) : (
+                    <select
+                      className="edit-day"
+                      value={endDay}
+                      title="Change the end day"
+                      onChange={e => {
+                        const next = Number(e.target.value) + (editEnd - endDay)
+                        setEditEnd(Math.max(next, editStart + snapMs))
+                      }}
+                    >
+                      {endDays.map(d => <option key={d} value={d}>{dayLabel(d)}</option>)}
+                    </select>
+                  )}
+                  <span />
                   <select
                     className="draft-input edit-select"
                     value={editStart}
-                    onChange={e => {
-                      const newStart = Number(e.target.value)
-                      const duration = editEnd - editStart
-                      setEditStart(newStart)
-                      if (!editing.running) setEditEnd(Math.min(newStart + duration, eday + DAY_MS))
-                    }}
+                    onChange={e => moveStart(Number(e.target.value))}
                   >
                     {startOpts.map(t => <option key={t} value={t}>{formatTime(t)}</option>)}
                   </select>
