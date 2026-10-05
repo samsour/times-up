@@ -229,14 +229,15 @@ export default function Timetable({
   // ── entry editor popup ────────────────────────────────────────────────────
   function openEditor(entry, entryDay) {
     const running = currentEntry?.id === entry.id
+    // Exact times, not snapped: the pickers list them alongside the grid so
+    // opening and saving untouched leaves the entry as it was. A running
+    // entry has no end yet; the editor shows "now" and only the start (and
+    // task) can change
     const start = parseInt(entry.start)
-    const snappedStart = snapT(start)
-    // A running entry has no end yet; the editor shows "now" and only the
-    // start (and task) can change
-    let snappedEnd = running
+    let end = running
       ? snapT(Date.now() + snapMs - 1)
-      : snapT(start + Math.max(parseInt(entry.duration || 0), 0))
-    if (snappedEnd <= snappedStart) snappedEnd = snappedStart + snapMs
+      : start + Math.max(parseInt(entry.duration || 0), 0)
+    if (end <= start) end = start + snapMs
     // `day` is the column the popup sits in; an overnight entry can be opened
     // from its continuation, so start and end carry their own dates
     resetDraft()
@@ -244,8 +245,8 @@ export default function Timetable({
     const sc = scrollRef.current
     const view = sc ? { top: sc.scrollTop - 8, height: sc.clientHeight } : null
     setEditing({ entry, running, day: entryDay, view })
-    setEditStart(snappedStart)
-    setEditEnd(snappedEnd)
+    setEditStart(start)
+    setEditEnd(end)
     setEditTaskText(entry.task?.name || '')
     setEditTaskPicked(null)
     setEditTaskResults(null)
@@ -889,7 +890,9 @@ export default function Timetable({
             for (let t = startDay; t <= startMax; t += snapMs) startOpts.push(t)
             if (!startOpts.includes(editStart)) startOpts.push(editStart), startOpts.sort((a, b) => a - b)
             const endOpts = []
-            for (let t = Math.max(endDay, editStart + snapMs); t <= endDay + DAY_MS; t += snapMs) endOpts.push(t)
+            // first grid step after the (possibly off-grid) start
+            const endFirst = Math.ceil((Math.max(endDay, editStart) + 1) / snapMs) * snapMs
+            for (let t = endFirst; t <= endDay + DAY_MS; t += snapMs) endOpts.push(t)
             if (!endOpts.includes(editEnd)) endOpts.push(editEnd), endOpts.sort((a, b) => a - b)
             const dayLabel = d => new Date(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
             // Moving the start day keeps the time of day and, unless running, the duration
