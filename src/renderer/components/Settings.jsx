@@ -59,6 +59,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [workdays, setWorkdays] = useState([1, 2, 3, 4, 5]) // getDay() numbers
   const [autoProgress, setAutoProgress] = useState(true)
   const [updateState, setUpdateState] = useState('idle')
+  const [versions, setVersions] = useState({ current: '', available: null })
   const [exportPreset, setExportPreset] = useState('week') // 'week' | 'month' | 'custom'
   const [exportFrom, setExportFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-01` })
   const [exportTo, setExportTo] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` })
@@ -95,12 +96,16 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
     })
     window.api.store.get('auto_progress').then(v => setAutoProgress(v !== false))
     window.api.updater.getState().then(setUpdateState)
+    window.api.updater.getVersions().then(setVersions)
     window.api.store.get('archive_urls').then(v => {
       setArchiveUrls(v || '')
       if (v) setArchiveAdvanced(true)
     })
     discoverArchive().then(found => { if (found || archiveUrls) refreshArchive(false) })
-    const offUpdater = window.api.updater.onStateChange(setUpdateState)
+    const offUpdater = window.api.updater.onStateChange(state => {
+      setUpdateState(state)
+      window.api.updater.getVersions().then(setVersions)
+    })
     return () => { offUpdater(); offStore() }
   }, [])
 
@@ -625,8 +630,13 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
           <span className="settings-row-title">
             {updateState === 'idle' && 'Up to date'}
             {updateState === 'checking' && 'Checking…'}
-            {updateState === 'downloading' && 'Downloading…'}
-            {updateState === 'ready' && 'Ready to install'}
+            {updateState === 'downloading' && `Downloading${versions.available ? ` ${versions.available}` : ''}…`}
+            {updateState === 'ready' && `${versions.available ? `${versions.available} ` : ''}ready to install`}
+            {versions.current && (
+              <span className="settings-goal-hint">
+                {updateState === 'idle' ? `v${versions.current}` : `from v${versions.current}`}
+              </span>
+            )}
           </span>
           {updateState === 'idle' && (
             <button className="settings-update-btn" onClick={() => window.api.updater.check()}>

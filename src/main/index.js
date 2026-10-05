@@ -19,6 +19,7 @@ const isDev = !app.isPackaged
 
 // 'idle' | 'checking' | 'downloading' | 'ready'
 let updateState = 'idle'
+let updateVersion = null // version being downloaded / ready to install
 
 autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
@@ -35,10 +36,11 @@ function setUpdateState(state) {
 }
 
 autoUpdater.on('checking-for-update', () => setUpdateState('checking'))
-autoUpdater.on('update-not-available', () => setUpdateState('idle'))
-autoUpdater.on('error', () => setUpdateState('idle'))
+autoUpdater.on('update-not-available', () => { updateVersion = null; setUpdateState('idle') })
+autoUpdater.on('error', () => { updateVersion = null; setUpdateState('idle') })
+autoUpdater.on('update-available', info => { updateVersion = info?.version || null; setUpdateState('downloading') })
 autoUpdater.on('download-progress', () => setUpdateState('downloading'))
-autoUpdater.on('update-downloaded', () => setUpdateState('ready'))
+autoUpdater.on('update-downloaded', info => { updateVersion = info?.version || updateVersion; setUpdateState('ready') })
 
 function createWindow() {
   win = new BrowserWindow({
@@ -516,6 +518,7 @@ ipcMain.handle('window:openStandalone', (_, view) => openStandaloneWindow(view |
 ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
 ipcMain.handle('update:check', () => { if (updateState === 'idle') autoUpdater.checkForUpdates() })
 ipcMain.handle('update:getState', () => updateState)
+ipcMain.handle('update:getVersions', () => ({ current: app.getVersion(), available: updateVersion }))
 ipcMain.handle('shell:openExternal', (_, url) => shell.openExternal(url))
 ipcMain.handle('app:getLoginItemSettings', () => app.getLoginItemSettings().openAtLogin)
 ipcMain.handle('app:setLoginItemSettings', (_, openAtLogin) => app.setLoginItemSettings({ openAtLogin }))

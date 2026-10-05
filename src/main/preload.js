@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   updater: {
     getState: () => ipcRenderer.invoke('update:getState'),
+    getVersions: () => ipcRenderer.invoke('update:getVersions'),
     check: () => ipcRenderer.invoke('update:check'),
     install: () => ipcRenderer.invoke('update:install'),
     onStateChange: (cb) => {
