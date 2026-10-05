@@ -241,16 +241,58 @@ export default function Timetable({
     return 0
   }
 
-  // Snapped time under the pointer; the day comes from the pointer's column
+  // Exact time under the pointer; the day comes from the pointer's column
   // unless the caller pins it (dragging stays inside one day)
-  function getTimeFromEvent(e, fixedDay = null) {
+  function pointerTime(e, fixedDay = null) {
     const g = geomRef.current
     if (!innerRef.current || !g) return null
     const rect = innerRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top
     const d = fixedDay ?? days[dayIndexAtX(e.clientX - rect.left)]
-    const t = snapT(d + g.minOff + (y / pxPerHour) * HOUR_MS)
+    const t = d + g.minOff + (y / pxPerHour) * HOUR_MS
     return Math.max(d, Math.min(t, d + DAY_MS))
+  }
+
+  // Same, snapped to the grid
+  function getTimeFromEvent(e, fixedDay = null) {
+    const t = pointerTime(e, fixedDay)
+    if (t === null) return null
+    const d = fixedDay ?? days[dayIndexOf(t)]
+    return Math.max(d, Math.min(snapT(t), d + DAY_MS))
+  }
+
+  // ── magnet: edges of neighbouring entries attract a dragged edge ─────────
+  // Start and end of every other entry on the day, as drag targets
+  function edgesOnDay(day, excludeId) {
+    const out = []
+    const dEnd = day + DAY_MS
+    for (const e of entries || []) {
+      if (e.id === excludeId) continue
+      const s = parseInt(e.start)
+      const en = currentEntry?.id === e.id ? now : s + Math.max(parseInt(e.duration || 0), 0)
+      if (en < day || s > dEnd) continue
+      if (s >= day) out.push(s)
+      if (en <= dEnd) out.push(en)
+    }
+    return out
+  }
+
+  // The nearest edge within a few pixels of t, or null. Beats the grid, so
+  // an entry can be laid flush against its neighbour whatever the snap is
+  const MAGNET_PX = 8
+  function magnet(t, edges) {
+    const thr = (MAGNET_PX / pxPerHour) * HOUR_MS
+    let best = null
+    for (const edge of edges) {
+      const dist = Math.abs(edge - t)
+      if (dist <= thr && (best === null || dist < Math.abs(best - t))) best = edge
+    }
+    return best
+  }
+
+  // Grid snap unless an edge is close enough to take over
+  function snapOrMagnet(t, edges) {
+    return magnet(t, edges) ?? snapT(t)
   }
 
   // ── entry editor popup ────────────────────────────────────────────────────
@@ -356,17 +398,23 @@ export default function Timetable({
 
     const rect = innerRef.current.getBoundingClientRect()
     const dragDay = days[dayIndexAtX(e.clientX - rect.left)]
-    const anchor = getTimeFromEvent(e, dragDay)
+    const edges = edgesOnDay(dragDay, null)
+    const clampDay = t => Math.max(dragDay, Math.min(t, dragDay + DAY_MS))
+    const timeAt = ev => {
+      const raw = pointerTime(ev, dragDay)
+      return raw === null ? null : clampDay(snapOrMagnet(raw, edges))
+    }
+    const anchor = timeAt(e)
     setDragRange({ day: dragDay, anchor, current: anchor })
 
     function onMove(ev) {
-      const current = getTimeFromEvent(ev, dragDay)
+      const current = timeAt(ev)
       if (current !== null) setDragRange({ day: dragDay, anchor, current })
     }
     function onUp(ev) {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
-      const current = getTimeFromEvent(ev, dragDay) ?? anchor
+      const current = timeAt(ev) ?? anchor
       const start = Math.min(anchor, current)
       const end = Math.max(anchor, current)
       setDragRange(null)
@@ -387,9 +435,12 @@ export default function Timetable({
     e.stopPropagation()
     e.preventDefault()
 
+    const isRunning = currentEntry?.id === entry.id
     const origStart = parseInt(entry.start)
-    const origDuration = parseInt(entry.duration || 0)
-    const anchorMs = getTimeFromEvent(e, blockDay)
+    // A running entry reports a negative duration; its end is now
+    const origDuration = isRunning ? Date.now() - origStart : parseInt(entry.duration || 0)
+    const anchorMs = pointerTime(e, blockDay)
+    const edges = edgesOnDay(blockDay, entry.id)
 
     const initial = {
       id: entry.id,
@@ -407,15 +458,27 @@ export default function Timetable({
     function onMove(ev) {
       if (!dragStarted && Math.abs(ev.clientX - downX) < 4 && Math.abs(ev.clientY - downY) < 4) return
       dragStarted = true
-      const t = getTimeFromEvent(ev, blockDay)
+      const t = pointerTime(ev, blockDay)
       if (t === null) return
       let next
       if (type === 'move') {
-        let newStart = snapT(origStart + (t - anchorMs))
+        // Either edge of the moving block may latch onto a neighbour
+        const rawStart = origStart + (t - anchorMs)
+        const mStart = magnet(rawStart, edges)
+        const mEnd = magnet(rawStart + origDuration, edges)
+        let newStart
+        if (mStart !== null && (mEnd === null || Math.abs(mStart - rawStart) <= Math.abs(mEnd - origDuration - rawStart))) newStart = mStart
+        else if (mEnd !== null) newStart = mEnd - origDuration
+        else newStart = snapT(rawStart)
         newStart = Math.max(blockDay, Math.min(newStart, blockDay + DAY_MS - origDuration))
         next = { ...draggingRef.current, currentStart: newStart, currentEnd: newStart + origDuration }
+      } else if (type === 'start') {
+        // Top edge: the end stays put
+        const end = origStart + origDuration
+        const newStart = Math.max(blockDay, Math.min(snapOrMagnet(t, edges), end - snapMs))
+        next = { ...draggingRef.current, currentStart: newStart }
       } else {
-        const newEnd = Math.max(snapT(t), origStart + snapMs)
+        const newEnd = Math.min(Math.max(snapOrMagnet(t, edges), origStart + snapMs), blockDay + DAY_MS)
         next = { ...draggingRef.current, currentEnd: newEnd }
       }
       draggingRef.current = next
@@ -436,14 +499,15 @@ export default function Timetable({
         return
       }
 
-      const changed = d.type === 'move'
-        ? d.currentStart !== d.origStart
-        : d.currentEnd !== d.origStart + d.origDuration
+      const changed = d.type === 'resize'
+        ? d.currentEnd !== d.origStart + d.origDuration
+        : d.currentStart !== d.origStart
       if (!changed) return
 
-      const body = d.type === 'move'
-        ? { start: d.currentStart, duration: d.origDuration }
-        : { start: d.origStart, duration: d.currentEnd - d.origStart }
+      let body
+      if (d.type === 'move') body = { start: d.currentStart, duration: d.origDuration }
+      else if (d.type === 'start') body = isRunning ? { start: d.currentStart } : { start: d.currentStart, duration: d.currentEnd - d.currentStart }
+      else body = { start: d.origStart, duration: d.currentEnd - d.origStart }
 
       updateTimeEntry(teamId, d.id, body)
         .then(() => onChange?.())
@@ -660,8 +724,8 @@ export default function Timetable({
               const realStart = parseInt(entry.start)
               let blockStart, blockEnd
               if (isDragging) {
-                blockStart = draggingBlock.type === 'move' ? draggingBlock.currentStart : draggingBlock.origStart
-                blockEnd = draggingBlock.currentEnd
+                blockStart = draggingBlock.type === 'resize' ? draggingBlock.origStart : draggingBlock.currentStart
+                blockEnd = isRunning ? now : draggingBlock.currentEnd
               } else {
                 blockStart = cont ? d : realStart
                 blockEnd = isRunning
@@ -767,6 +831,14 @@ export default function Timetable({
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                     </button>
+                  )}
+                  {/* Top edge moves the start; a continuation's top is midnight, not its start */}
+                  {!cont && (
+                    <div
+                      className="timetable-block-start-handle"
+                      onMouseDown={e => { e.stopPropagation(); handleBlockMouseDown(e, entry, 'start', d) }}
+                      onClick={e => e.stopPropagation()}
+                    />
                   )}
                   {!isRunning && (
                     <div
