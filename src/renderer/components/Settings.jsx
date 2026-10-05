@@ -52,6 +52,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [tone, setTone] = useState('warm')
   const [accent, setAccent] = useState('coral')
   const [idleDetection, setIdleDetection] = useState(false)
+  const [snapToGrid, setSnapToGrid] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(5)
   const [idleText, setIdleText] = useState('not tracking rn')
   const [weeklyGoalHours, setWeeklyGoalHours] = useState('')
@@ -81,9 +82,11 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       if (key === 'tone') setTone(value || 'warm')
       if (key === 'accent') setAccent(value || 'coral')
       if (key === 'open_as_window') setOpenAsWindow(!!value)
+      if (key === 'snap_to_grid') setSnapToGrid(!!value)
       if (key === 'archive_urls') setArchiveUrls(value || '')
     })
     window.api.store.get('idleDetection').then(v => setIdleDetection(!!v))
+    window.api.store.get('snap_to_grid').then(v => setSnapToGrid(!!v))
     window.api.store.get('idleThreshold').then(v => setIdleThreshold(v || 5))
     window.api.store.get('idleText').then(v => setIdleText(v || 'not tracking rn'))
     getGoals().then(g => {
@@ -386,6 +389,21 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
             />
             <span className="settings-number-unit">h / week</span>
           </div>
+        </div>
+        <div className="settings-row">
+          <span className="settings-row-title" title="Round times to the timetable grid (15 min, 5 min when zoomed in) while dragging and in the entry editor. Off: times are kept to the minute">
+            Snap to grid
+          </span>
+          <button
+            className={`settings-toggle ${snapToGrid ? 'settings-toggle-on' : ''}`}
+            onClick={async () => {
+              const next = !snapToGrid
+              setSnapToGrid(next)
+              await window.api.store.set('snap_to_grid', next)
+            }}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
         </div>
         <div className="settings-row">
           <span className="settings-row-title" title="Days you normally work — your average divides by these; time tracked on other days only adds on top">

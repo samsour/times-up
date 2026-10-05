@@ -6,6 +6,9 @@ import './Timetable.css'
 
 const LABEL_W = 44
 const SNAP_MS = 15 * 60 * 1000
+const MINUTE_MS = 60 * 1000
+const MIN_DRAG_MS = 5 * MINUTE_MS // shortest drag that creates a draft
+const SNAP_KEY = 'snap_to_grid'
 const HOUR_MS = 3600000
 const DAY_MS = 24 * HOUR_MS
 const COLS_X = LABEL_W + 6
@@ -13,6 +16,19 @@ const DAY_GAP = 4 // horizontal gap between day columns in multi-day mode
 
 function snap(ms, step = SNAP_MS) {
   return Math.round(ms / step) * step
+}
+
+// "HH:MM" <-> ms within a day, for the minute-precise time inputs
+function toHM(t) {
+  const d = new Date(t)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+function fromHM(dayStart, hm) {
+  const [h, m] = (hm || '').split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return null
+  const d = new Date(dayStart)
+  d.setHours(h, m, 0, 0)
+  return d.getTime()
 }
 
 // Calendar-day arithmetic that survives DST changes
@@ -61,8 +77,19 @@ export default function Timetable({
 
   const [now, setNow] = useState(Date.now())
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
-  const { px: pxPerHour, snap: snapMs } = ZOOM_LEVELS[zoom]
+  // Snapping is opt-in: by default drags and the editor work to the minute,
+  // with the zoom level's grid used only when the user turns snapping on
+  const [snapOn, setSnapOn] = useState(false)
+  const { px: pxPerHour, snap: gridMs } = ZOOM_LEVELS[zoom]
+  const snapMs = snapOn ? gridMs : MINUTE_MS
   const snapT = ms => snap(ms, snapMs)
+
+  useEffect(() => {
+    window.api.store.get(SNAP_KEY).then(v => setSnapOn(!!v))
+    return window.api.store.onChange(({ key, value }) => {
+      if (key === SNAP_KEY) setSnapOn(!!value)
+    })
+  }, [])
 
   useEffect(() => {
     window.api.store.get(ZOOM_KEY).then(v => {
@@ -343,7 +370,7 @@ export default function Timetable({
       const start = Math.min(anchor, current)
       const end = Math.max(anchor, current)
       setDragRange(null)
-      if (end - start >= snapMs) {
+      if (end - start >= Math.max(snapMs, MIN_DRAG_MS)) {
         setDraft({ day: dragDay, start, end })
         setDraftDesc('')
         setDraftTask(null)
@@ -654,7 +681,7 @@ export default function Timetable({
             }
             for (const b of sorted) {
               // treat blocks as at least one slot tall so the 18px minimum height can't hide anything
-              const effEnd = Math.max(b.blockEnd, b.blockStart + snapMs)
+              const effEnd = Math.max(b.blockEnd, b.blockStart + gridMs)
               if (cluster.length && b.blockStart >= Math.max(...lanes)) finalize()
               let lane = lanes.findIndex(end => end <= b.blockStart)
               if (lane === -1) {
@@ -886,14 +913,18 @@ export default function Timetable({
             const startMax = editing.running
               ? Math.min(Math.max(snapT(Date.now()), editStart), startDay + DAY_MS - snapMs)
               : startDay + DAY_MS - snapMs
+            // Option lists for the grid pickers (snapping on); the entry's
+            // exact times are listed too so an untouched save changes nothing
             const startOpts = []
-            for (let t = startDay; t <= startMax; t += snapMs) startOpts.push(t)
-            if (!startOpts.includes(editStart)) startOpts.push(editStart), startOpts.sort((a, b) => a - b)
             const endOpts = []
-            // first grid step after the (possibly off-grid) start
-            const endFirst = Math.ceil((Math.max(endDay, editStart) + 1) / snapMs) * snapMs
-            for (let t = endFirst; t <= endDay + DAY_MS; t += snapMs) endOpts.push(t)
-            if (!endOpts.includes(editEnd)) endOpts.push(editEnd), endOpts.sort((a, b) => a - b)
+            if (snapOn) {
+              for (let t = startDay; t <= startMax; t += snapMs) startOpts.push(t)
+              if (!startOpts.includes(editStart)) startOpts.push(editStart), startOpts.sort((a, b) => a - b)
+              // first grid step after the (possibly off-grid) start
+              const endFirst = Math.ceil((Math.max(endDay, editStart) + 1) / snapMs) * snapMs
+              for (let t = endFirst; t <= endDay + DAY_MS; t += snapMs) endOpts.push(t)
+              if (!endOpts.includes(editEnd)) endOpts.push(editEnd), endOpts.sort((a, b) => a - b)
+            }
             const dayLabel = d => new Date(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
             // Moving the start day keeps the time of day and, unless running, the duration
             const moveStart = newStart => {
@@ -938,17 +969,31 @@ export default function Timetable({
                     </select>
                   )}
                   <span />
-                  <select
-                    className="draft-input edit-select"
-                    value={editStart}
-                    onChange={e => moveStart(Number(e.target.value))}
-                  >
-                    {startOpts.map(t => <option key={t} value={t}>{formatTime(t)}</option>)}
-                  </select>
+                  {snapOn ? (
+                    <select
+                      className="draft-input edit-select"
+                      value={editStart}
+                      onChange={e => moveStart(Number(e.target.value))}
+                    >
+                      {startOpts.map(t => <option key={t} value={t}>{formatTime(t)}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      className="draft-input edit-select edit-time"
+                      type="time"
+                      value={toHM(editStart)}
+                      max={editing.running ? toHM(Math.min(now, startDay + DAY_MS - MINUTE_MS)) : undefined}
+                      onChange={e => {
+                        const t = fromHM(startDay, e.target.value)
+                        if (t === null) return
+                        moveStart(editing.running ? Math.min(t, now) : t)
+                      }}
+                    />
+                  )}
                   <span className="edit-times-sep">–</span>
                   {editing.running ? (
                     <span className="draft-input edit-select edit-now" title="Still running">now</span>
-                  ) : (
+                  ) : snapOn ? (
                     <select
                       className="draft-input edit-select"
                       value={editEnd}
@@ -956,6 +1001,17 @@ export default function Timetable({
                     >
                       {endOpts.map(t => <option key={t} value={t}>{formatTime(t)}</option>)}
                     </select>
+                  ) : (
+                    <input
+                      className="draft-input edit-select edit-time"
+                      type="time"
+                      value={toHM(editEnd)}
+                      onChange={e => {
+                        const t = fromHM(endDay, e.target.value)
+                        if (t === null) return
+                        setEditEnd(Math.max(t, editStart + MINUTE_MS))
+                      }}
+                    />
                   )}
                   <span className="draft-dur">
                     {formatDurationShort((editing.running ? now : editEnd) - editStart)}

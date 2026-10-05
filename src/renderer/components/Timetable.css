@@ -463,6 +463,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Minute-precise time field (snapping off) */
+.edit-time {
+  cursor: text;
+  color-scheme: dark;
+}
+
+.edit-time::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+:root[data-theme="light"] .edit-time {
+  color-scheme: light;
+}
+
 .draft-task-chip {
   display: flex;
   align-items: center;
