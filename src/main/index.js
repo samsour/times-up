@@ -293,21 +293,9 @@ const STRUCTURE_TTL = 5 * 60_000
 const STRUCTURE_RE = /^\/team(\/\d+\/space)?(\?|$)|^\/space\/\d+\/(folder|list)(\?|$)|^\/folder\/\d+\/list(\?|$)|^\/list\/\d+(\?|$)/
 const structureCache = new Map() // path -> { at, data }
 
-// IPC: ClickUp API proxy (avoids CORS, keeps token in main process)
-ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
-  const token = store.get('clickup_token')
-  if (!token) throw new Error('No API token set')
-
-  const cacheable = method === 'GET' && STRUCTURE_RE.test(path)
-  if (cacheable) {
-    const hit = structureCache.get(path)
-    if (hit && Date.now() - hit.at < STRUCTURE_TTL) return hit.data
-  } else if (method !== 'GET') {
-    structureCache.clear()
-  }
-
-  // Rate-limit bursts degrade into a short wait instead of an error:
-  // retry 429s up to 3 times, honoring Retry-After when ClickUp sends it
+// One ClickUp call. Rate-limit bursts degrade into a short wait instead of
+// an error: 429s retry up to 3 times, honoring Retry-After when sent.
+async function clickupFetch(token, method, path, body) {
   const t0 = Date.now()
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`https://api.clickup.com/api/v2${path}`, {
@@ -330,9 +318,26 @@ ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
     const data = await res.json().catch(() => ({}))
     if (isDev) console.log(`[api] ${res.status} ${method} ${path.split('?')[0]} ${Date.now() - t0}ms`)
     if (!res.ok) throw new Error(data.err || `HTTP ${res.status}`)
-    if (cacheable) structureCache.set(path, { at: Date.now(), data })
     return data
   }
+}
+
+// IPC: ClickUp API proxy (avoids CORS, keeps token in main process)
+ipcMain.handle('clickup:request', async (_, { method = 'GET', path, body }) => {
+  const token = store.get('clickup_token')
+  if (!token) throw new Error('No API token set')
+
+  const cacheable = method === 'GET' && STRUCTURE_RE.test(path)
+  if (cacheable) {
+    const hit = structureCache.get(path)
+    if (hit && Date.now() - hit.at < STRUCTURE_TTL) return hit.data
+  } else if (method !== 'GET') {
+    structureCache.clear()
+  }
+
+  const data = await clickupFetch(token, method, path, body)
+  if (cacheable) structureCache.set(path, { at: Date.now(), data })
+  return data
 })
 
 // IPC: archived time entries (Toggl CSV exports) fetched from plain share
@@ -404,8 +409,26 @@ function parseTaskRef(line) {
   return null
 }
 
-async function expandArchiveSources(lines) {
+// Archive task lookups are repeated by discover, load and Reports within
+// seconds of each other; one short-lived cache keeps that to a single
+// round of requests (and out of ClickUp's rate limit)
+const ARCHIVE_LOOKUP_TTL = 60_000
+const archiveLookupCache = new Map() // key -> { at, promise }
+
+function archiveLookup(key, fetcher, force = false) {
+  const hit = archiveLookupCache.get(key)
+  if (hit && !force && Date.now() - hit.at < ARCHIVE_LOOKUP_TTL) return hit.promise
+  const promise = fetcher().catch(err => { archiveLookupCache.delete(key); throw err })
+  archiveLookupCache.set(key, { at: Date.now(), promise })
+  return promise
+}
+
+function getArchiveTask(taskId, force) {
   const token = store.get('clickup_token')
+  return archiveLookup(`task:${taskId}`, () => clickupFetch(token, 'GET', `/task/${taskId}`), force)
+}
+
+async function expandArchiveSources(lines, force) {
   const out = []
   for (const line of lines) {
     const taskId = parseTaskRef(line)
@@ -414,9 +437,7 @@ async function expandArchiveSources(lines) {
       continue
     }
     try {
-      const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}`, { headers: { Authorization: token } })
-      if (!res.ok) throw new Error(`task ${taskId}: HTTP ${res.status}`)
-      const task = await res.json()
+      const task = await getArchiveTask(taskId, force).catch(e => { throw new Error(`task ${taskId}: ${e.message}`) })
       const csvs = (task.attachments || []).filter(a => /\.csv$/i.test(a.title || '') && a.url)
       if (!csvs.length) out.push({ url: null, label: task.name, error: 'Task has no CSV attachments' })
       for (const a of csvs) out.push({ url: a.url, label: a.title })
@@ -431,26 +452,22 @@ async function expandArchiveSources(lines) {
 // link: every task tagged like this that the user can see is a source.
 const ARCHIVE_TAG = 'timesup-archive'
 
-async function discoverArchiveTasks() {
+async function discoverArchiveTasks(force) {
   const token = store.get('clickup_token')
   const teamId = store.get('team_id')
   if (!token || !teamId) return []
   const params = new URLSearchParams({ include_closed: 'true', subtasks: 'true' })
   params.append('tags[]', ARCHIVE_TAG)
-  const res = await fetch(`https://api.clickup.com/api/v2/team/${teamId}/task?${params}`, { headers: { Authorization: token } })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const { tasks } = await res.json()
+  const { tasks } = await archiveLookup('discover', () => clickupFetch(token, 'GET', `/team/${teamId}/task?${params}`), force)
   return (tasks || []).map(t => ({ id: t.id, name: t.name, url: t.url, listName: t.list?.name }))
 }
 
-ipcMain.handle('archive:discover', async () => {
-  const tasks = await discoverArchiveTasks()
+ipcMain.handle('archive:discover', async (_, { force = false } = {}) => {
+  const tasks = await discoverArchiveTasks(force)
   // attachment counts need the task detail
-  const token = store.get('clickup_token')
   return Promise.all(tasks.map(async t => {
     try {
-      const res = await fetch(`https://api.clickup.com/api/v2/task/${t.id}`, { headers: { Authorization: token } })
-      const task = await res.json()
+      const task = await getArchiveTask(t.id, force)
       const csvCount = (task.attachments || []).filter(a => /\.csv$/i.test(a.title || '')).length
       return { ...t, csvCount }
     } catch {
@@ -476,6 +493,7 @@ ipcMain.handle('archive:createTask', async (_, { listId }) => {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.err || `HTTP ${res.status}`)
   structureCache.clear()
+  archiveLookupCache.clear()
   return { id: data.id, name: data.name, url: data.url }
 })
 
@@ -485,9 +503,9 @@ ipcMain.handle('archive:load', async (_, { force = false } = {}) => {
     .map(u => u.trim())
     .filter(Boolean)
   let discovered = []
-  try { discovered = await discoverArchiveTasks() } catch (e) { discovered = [{ id: null, name: 'Archive lookup', error: e.message }] }
-  const manual = await expandArchiveSources(lines)
-  const tagged = await expandArchiveSources(discovered.filter(t => t.id).map(t => t.id))
+  try { discovered = await discoverArchiveTasks(force) } catch (e) { discovered = [{ id: null, name: 'Archive lookup', error: e.message }] }
+  const manual = await expandArchiveSources(lines, force)
+  const tagged = await expandArchiveSources(discovered.filter(t => t.id).map(t => t.id), force)
   const sources = [
     ...discovered.filter(t => !t.id).map(t => ({ url: null, label: t.name, error: t.error })),
     ...tagged,

@@ -110,9 +110,9 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   }, [])
 
   // Finds tagged archive tasks; returns whether any exist
-  async function discoverArchive() {
+  async function discoverArchive(force = false) {
     try {
-      const tasks = await window.api.archive.discover()
+      const tasks = await window.api.archive.discover(force)
       setArchiveTasks(tasks)
       setArchiveError('')
       if (!tasks.length && !archiveLists.length) {
@@ -150,7 +150,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   async function refreshArchive(force) {
     setArchiveLoading(true)
     try {
-      if (force) { clearArchiveCache(); await discoverArchive() }
+      if (force) { clearArchiveCache(); await discoverArchive(true) }
       const { files, entries } = await loadArchive(force)
       setArchiveStatus({ files, entries: entries.length })
     } catch (e) {

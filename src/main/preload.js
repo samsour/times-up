@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   archive: {
     load: (force) => ipcRenderer.invoke('archive:load', { force }),
-    discover: () => ipcRenderer.invoke('archive:discover'),
+    discover: (force) => ipcRenderer.invoke('archive:discover', { force }),
     createTask: (listId) => ipcRenderer.invoke('archive:createTask', { listId })
   },
   window: {
