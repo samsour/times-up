@@ -146,6 +146,11 @@
   background: var(--cta-bg);
 }
 
+.settings-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .settings-toggle-knob {
   position: absolute;
   top: 3px;

@@ -48,6 +48,7 @@ function downloadCSV(content, filename) {
 
 export default function Settings({ teamId, theme, onThemeChange, font, onFontChange, onSignOut }) {
   const [autoLaunch, setAutoLaunch] = useState(false)
+  const [autoLaunchAvailable, setAutoLaunchAvailable] = useState(true)
   const [openAsWindow, setOpenAsWindow] = useState(false)
   const [tone, setTone] = useState('warm')
   const [accent, setAccent] = useState('coral')
@@ -76,7 +77,10 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const archiveSaveTimer = useRef(null)
 
   useEffect(() => {
-    window.api.app.getLoginItemSettings().then(setAutoLaunch)
+    window.api.app.getLoginItemSettings().then(r => {
+      setAutoLaunch(!!r?.openAtLogin)
+      setAutoLaunchAvailable(r?.available !== false)
+    })
     window.api.store.get('open_as_window').then(v => setOpenAsWindow(!!v))
     loadAppearance().then(a => { setTone(a.tone); setAccent(a.accent) })
     const offStore = window.api.store.onChange(({ key, value }) => {
@@ -309,9 +313,13 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       <div className="settings-section">
         <div className="settings-label">System</div>
         <div className="settings-row">
-          <span className="settings-row-title">Launch at login</span>
+          <span className="settings-row-title" title={autoLaunchAvailable ? undefined : 'Only available in the packaged app'}>
+            Launch at login
+            {!autoLaunchAvailable && <span className="settings-goal-hint">dev build</span>}
+          </span>
           <button
             className={`settings-toggle ${autoLaunch ? 'settings-toggle-on' : ''}`}
+            disabled={!autoLaunchAvailable}
             onClick={() => handleAutoLaunch(!autoLaunch)}
           >
             <span className="settings-toggle-knob" />

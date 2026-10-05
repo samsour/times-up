@@ -263,6 +263,12 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin') {
     app.dock?.hide()
   }
+  // A dev build must never be a login item: Electron would register its
+  // bare binary from node_modules, which opens the Electron welcome page at
+  // the next login. Clear one left behind by an earlier build.
+  if (isDev && app.getLoginItemSettings().openAtLogin) {
+    app.setLoginItemSettings({ openAtLogin: false })
+  }
   createWindow()
   createTray()
   if (!isDev) autoUpdater.checkForUpdatesAndNotify()
@@ -538,8 +544,14 @@ ipcMain.handle('update:check', () => { if (updateState === 'idle') autoUpdater.c
 ipcMain.handle('update:getState', () => updateState)
 ipcMain.handle('update:getVersions', () => ({ current: app.getVersion(), available: updateVersion }))
 ipcMain.handle('shell:openExternal', (_, url) => shell.openExternal(url))
-ipcMain.handle('app:getLoginItemSettings', () => app.getLoginItemSettings().openAtLogin)
-ipcMain.handle('app:setLoginItemSettings', (_, openAtLogin) => app.setLoginItemSettings({ openAtLogin }))
+ipcMain.handle('app:getLoginItemSettings', () => ({
+  openAtLogin: !isDev && app.getLoginItemSettings().openAtLogin,
+  available: !isDev,
+}))
+ipcMain.handle('app:setLoginItemSettings', (_, openAtLogin) => {
+  if (isDev) return
+  app.setLoginItemSettings({ openAtLogin })
+})
 ipcMain.handle('idle:dismiss', () => { idlePromptShown = false })
 
 let idlePromptShown = false
