@@ -846,16 +846,23 @@ export default function Timetable({
 
           {editing && (() => {
             const eday = editing.day
-            // Sit at the entry's start, but stay within the canvas and within
-            // the part of it that was visible when the editor opened (the
+            // Prefer sitting just above the block so the entry stays visible,
+            // then just below it; only cover it when neither fits in the part
+            // of the canvas that was on screen when the editor opened (the
             // scroll container has 8px top padding, hence the view offset)
             const POPUP_H = 220
-            let top = Math.min(offToY(editStart - eday), gridH - POPUP_H)
-            if (editing.view) {
-              const { top: vt, height: vh } = editing.view
-              top = Math.min(Math.max(top, vt + 8), vt + vh - POPUP_H - 8)
-            }
-            top = Math.max(top, 0)
+            const GAP = 6
+            const view = editing.view
+            const viewTop = view ? view.top + 8 : 0
+            const viewBot = view ? view.top + view.height - 8 : gridH
+            const es = parseInt(editing.entry.start)
+            const ee = editing.running ? now : es + Math.max(parseInt(editing.entry.duration || 0), 0)
+            const bTop = offToY(Math.max(es, eday) - eday)
+            const bBot = offToY(Math.min(ee, eday + DAY_MS) - eday)
+            let top
+            if (bTop - GAP - POPUP_H >= Math.max(viewTop, 0)) top = bTop - GAP - POPUP_H
+            else if (bBot + GAP + POPUP_H <= Math.min(viewBot, gridH)) top = bBot + GAP
+            else top = Math.max(Math.min(Math.max(bTop, viewTop), viewBot - POPUP_H, gridH - POPUP_H), 0)
             const startDay = startOfDay(editStart)
             const endDay = startOfDay(editEnd)
             // Start can be any day from two weeks before the entry up to
