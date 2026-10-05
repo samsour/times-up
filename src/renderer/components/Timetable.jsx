@@ -234,7 +234,10 @@ export default function Timetable({
     // `day` is the column the popup sits in; an overnight entry can be opened
     // from its continuation, so start and end carry their own dates
     resetDraft()
-    setEditing({ entry, running, day: entryDay })
+    // Remember what was on screen so the popup can be kept inside it
+    const sc = scrollRef.current
+    const view = sc ? { top: sc.scrollTop - 8, height: sc.clientHeight } : null
+    setEditing({ entry, running, day: entryDay, view })
     setEditStart(snappedStart)
     setEditEnd(snappedEnd)
     setEditTaskText(entry.task?.name || '')
@@ -843,8 +846,16 @@ export default function Timetable({
 
           {editing && (() => {
             const eday = editing.day
-            const totalH = gridH
-            const top = Math.max(Math.min(offToY(editStart - eday), totalH - 200), 0)
+            // Sit at the entry's start, but stay within the canvas and within
+            // the part of it that was visible when the editor opened (the
+            // scroll container has 8px top padding, hence the view offset)
+            const POPUP_H = 220
+            let top = Math.min(offToY(editStart - eday), gridH - POPUP_H)
+            if (editing.view) {
+              const { top: vt, height: vh } = editing.view
+              top = Math.min(Math.max(top, vt + 8), vt + vh - POPUP_H - 8)
+            }
+            top = Math.max(top, 0)
             const startDay = startOfDay(editStart)
             const endDay = startOfDay(editEnd)
             // Start can be any day from two weeks before the entry up to
