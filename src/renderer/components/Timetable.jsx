@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createTimeEntry, updateTimeEntry, deleteTimeEntry, searchTasks, startTimer, stopTimer, getCurrentTimer } from '../lib/clickup.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { formatDurationShort, formatTime, startOfDay } from '../lib/time.js'
@@ -127,6 +127,12 @@ export default function Timetable({
   const [editTaskText, setEditTaskText] = useState('')
   const [editTaskPicked, setEditTaskPicked] = useState(null)
   const [editTaskResults, setEditTaskResults] = useState(null)
+  // Measured height of the edit popup, so it can be placed beside its block
+  const editRef = useRef(null)
+  const [editH, setEditH] = useState(0)
+  useLayoutEffect(() => {
+    if (editing && editRef.current) setEditH(editRef.current.offsetHeight)
+  }, [editing, editTaskResults])
   const [dropTime, setDropTime] = useState(null)
   const editSearchRef = useRef(null)
   const draggingRef = useRef(null)
@@ -850,7 +856,7 @@ export default function Timetable({
             // then just below it; only cover it when neither fits in the part
             // of the canvas that was on screen when the editor opened (the
             // scroll container has 8px top padding, hence the view offset)
-            const POPUP_H = 220
+            const POPUP_H = editH || 150
             const GAP = 6
             const view = editing.view
             const viewTop = view ? view.top + 8 : 0
@@ -859,10 +865,12 @@ export default function Timetable({
             const ee = editing.running ? now : es + Math.max(parseInt(editing.entry.duration || 0), 0)
             const bTop = offToY(Math.max(es, eday) - eday)
             const bBot = offToY(Math.min(ee, eday + DAY_MS) - eday)
-            let top
-            if (bTop - GAP - POPUP_H >= Math.max(viewTop, 0)) top = bTop - GAP - POPUP_H
-            else if (bBot + GAP + POPUP_H <= Math.min(viewBot, gridH)) top = bBot + GAP
-            else top = Math.max(Math.min(Math.max(bTop, viewTop), viewBot - POPUP_H, gridH - POPUP_H), 0)
+            // Above is anchored by its bottom edge, so it hugs the block
+            // whatever the popup's exact height turns out to be
+            let pos
+            if (bTop - GAP - POPUP_H >= Math.max(viewTop, 0)) pos = { bottom: gridH - (bTop - GAP) }
+            else if (bBot + GAP + POPUP_H <= Math.min(viewBot, gridH)) pos = { top: bBot + GAP }
+            else pos = { top: Math.max(Math.min(Math.max(bTop, viewTop), viewBot - POPUP_H, gridH - POPUP_H), 0) }
             const startDay = startOfDay(editStart)
             const endDay = startOfDay(editEnd)
             // Start can be any day from two weeks before the entry up to
@@ -892,8 +900,9 @@ export default function Timetable({
             }
             return (
               <div
+                ref={editRef}
                 className="timetable-draft-form timetable-edit-form"
-                style={{ top, ...popupBox(eday, 260) }}
+                style={{ ...pos, ...popupBox(eday, 260) }}
                 onKeyDown={e => { if (e.key === 'Escape') setEditing(null) }}
               >
                 <button className="popup-close" onClick={() => setEditing(null)} title="Close (Esc)">
