@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { startTimer, stopTimer, getTimeEntries, createTask } from '../lib/clickup.js'
-import { CreateTaskForm } from './Today.jsx'
+import { CreateTaskForm } from './CreateTask.jsx'
 import { formatDuration, formatDurationShort, formatTime, startOfDay, endOfDay } from '../lib/time.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './Focus.css'

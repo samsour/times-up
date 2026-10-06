@@ -9,6 +9,7 @@ import {
 import { formatDuration, formatDurationShort, formatTime, startOfDay, endOfDay } from '../lib/time.js'
 import { getGoals } from '../lib/goals.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
+import { CreateTaskForm } from './CreateTask.jsx'
 import './TimerBar.css'
 
 // Compact always-visible timer strip: start/stop, elapsed, task switch,
@@ -37,6 +38,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   const text = noteMode ? noteDraft : query
   const setText = noteMode ? setNoteDraft : setQuery
   const [navigated, setNavigated] = useState(false) // arrow keys used, so Enter picks
+  const [creating, setCreating] = useState(false) // the new-task form under the field
 
   const { tasks: taskItems, settled: searchSettled } = useTaskSuggestions(teamId, userId, text, {
     excludeId: runningTask?.id ?? null,
@@ -142,12 +144,11 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
     }
   }
 
-  async function handleCreateTask() {
-    const name = text.trim()
-    if (!name || !lastList) return
+  async function handleCreateTask(listId = lastList?.id, name = text.trim()) {
+    if (!name || !listId) return
     setBusy(true)
     try {
-      const task = await createTask(lastList.id, name)
+      const task = await createTask(listId, name)
       if (isRunning) {
         await updateTimeEntry(teamId, currentEntry.id, { tid: task.id })
       } else {
@@ -156,6 +157,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
       setQuery('')
       setOpen(false)
       setSwitching(false)
+      setCreating(false)
       onChange()
       onTaskTracked?.(task.id)
     } catch (err) {
@@ -290,7 +292,18 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                 autoFocus={switching}
                 maxLength={noteMode ? 200 : undefined}
               />
-              {open && (
+              {creating && (
+                <div className="timer-bar-dropdown timer-bar-create">
+                  <CreateTaskForm
+                    teamId={teamId}
+                    initialName={text.trim()}
+                    busy={busy}
+                    onCreate={(listId, name) => handleCreateTask(listId, name)}
+                    onCancel={() => { setCreating(false); inputRef.current?.focus() }}
+                  />
+                </div>
+              )}
+              {open && !creating && (
                 <div className="timer-bar-dropdown">
                   {showStartNote && (
                     <button
@@ -346,7 +359,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                     <button
                       className="suggestion-browse"
                       onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setOpen(false); onBrowse(text.trim()) }}
+                      onClick={() => { setOpen(false); setCreating(true) }}
                     >
                       {showCreate ? 'Create in another list…' : `+ Create “${text.trim()}”…`}
                     </button>

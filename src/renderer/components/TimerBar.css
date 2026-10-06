@@ -177,6 +177,11 @@
 
 /* dropdown */
 
+.timer-bar-create {
+  padding: 10px;
+  overflow: visible;
+}
+
 .timer-bar-dropdown {
   position: absolute;
   top: calc(100% + 6px);

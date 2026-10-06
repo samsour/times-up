@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
-import { getSpaces, getFolders, getFolderlessLists, getListsInFolder, getTasks, createTask } from '../lib/clickup.js'
+import { useState, useEffect, useRef } from 'react'
+import { getSpaces, getFolders, getFolderlessLists, getListsInFolder, getTasks, createTask, getAllLists } from '../lib/clickup.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
-import { CreateTaskForm } from './Today.jsx'
+import { CreateTaskForm } from './CreateTask.jsx'
 import './TaskPicker.css'
 
 export default function TaskPicker({ teamId, userId, initialSearch = '', onPick, onCancel }) {
@@ -14,10 +14,29 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', onPick,
   const [creating, setCreating] = useState(false) // list picker form, from a search with no match
   const [busy, setBusy] = useState(false)
   const [lastList, setLastList] = useState(null)
+  const [allLists, setAllLists] = useState(null) // for matching lists while searching
+  const pendingNewName = useRef(null) // name to offer once a list opened from a search has loaded
 
   useEffect(() => {
     window.api.store.get('last_list').then(l => l && setLastList(l))
   }, [])
+
+  // Lists are searchable too, loaded the first time a query is typed
+  useEffect(() => {
+    if (!search.trim() || allLists !== null) return
+    getAllLists(teamId).then(ls => setAllLists(ls || [])).catch(() => setAllLists([]))
+  }, [search, teamId, allLists])
+
+  const qLower = search.trim().toLowerCase()
+  const listMatches = qLower
+    ? (allLists || []).filter(l => l.name.toLowerCase().includes(qLower) || (l.path || '').toLowerCase().includes(qLower)).slice(0, 4)
+    : []
+
+  // Open a list from a search; the typed text becomes the new task's name
+  function openListFromSearch(l) {
+    pendingNewName.current = search.trim()
+    setCrumbs([crumbs[0], { type: 'list', id: l.id, name: l.name }])
+  }
 
   // Create, then hand the new task over as if it had been picked
   async function createAndPick(listId, name) {
@@ -79,6 +98,11 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', onPick,
         }))
       }
       setItems(result)
+      // Arrived here from a search: offer the typed name as a new task
+      if (current.type === 'list' && pendingNewName.current !== null) {
+        setNewName(pendingNewName.current)
+        pendingNewName.current = null
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -243,6 +267,22 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', onPick,
               onCancel={() => setCreating(false)}
             />
           </div>
+        )}
+        {isSearching && !creating && listMatches.length > 0 && (
+          <>
+            <div className="picker-section">Lists</div>
+            {listMatches.map(l => (
+              <button key={`list-${l.id}`} className="picker-item" onClick={() => openListFromSearch(l)} title={`Open ${l.name}; the text becomes the new task's name`}>
+                <span className="picker-icon picker-icon-list" style={l.color ? { background: `color-mix(in srgb, ${l.color} 18%, transparent)`, color: l.color } : undefined}>{iconFor('list')}</span>
+                <span className="picker-item-info">
+                  <span className="picker-item-name">{l.name}</span>
+                  {l.path && <span className="picker-item-context">{l.path}</span>}
+                </span>
+                <svg className="picker-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6" /></svg>
+              </button>
+            ))}
+            {searchResults.length > 0 && <div className="picker-section">Tasks</div>}
+          </>
         )}
         {isSearching && !creating && searchResults.map(task => (
           <button

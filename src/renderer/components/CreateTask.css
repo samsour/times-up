@@ -1,0 +1,174 @@
+/* Shared new-task form: name, list, create */
+
+.ct {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ct-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 999px;
+}
+
+.ct-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.ct-input::placeholder {
+  color: var(--text-muted);
+}
+
+.ct-list {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ct-list-label {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding-left: 4px;
+}
+
+.ct-list-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.ct-list-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-hover);
+  text-align: left;
+  transition: all 0.12s;
+}
+
+.ct-list-btn:hover:not(:disabled) {
+  background: var(--accent-dim);
+}
+
+.ct-list-btn-empty {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.ct-list-btn-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ct-list-btn svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.ct-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.ct-options-note {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ct-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 10px;
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+
+.ct-option-active {
+  background: var(--bg-hover);
+}
+
+.ct-option-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ct-option-meta {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ct-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ct-cancel {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  border-radius: 999px;
+}
+
+.ct-cancel:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.ct-go {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  color: var(--cta-text);
+  background: var(--cta-bg);
+  transition: all 0.12s;
+}
+
+.ct-go:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.ct-go:disabled {
+  opacity: 0.5;
+}

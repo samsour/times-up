@@ -6,10 +6,10 @@ import {
   startTimer,
   stopTimer,
   createTask,
-  getAllLists,
   getListColors,
 } from '../lib/clickup.js'
 import { formatDurationShort, formatTime, formatDate, startOfDay, endOfDay, startOfWeek } from '../lib/time.js'
+import { CreateTaskForm } from './CreateTask.jsx'
 import { getGoals } from '../lib/goals.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './Today.css'
@@ -563,125 +563,6 @@ function AssignForm({ teamId, excludeId = null, onPick, onCancel, busy }) {
       </div>
       <div className="draft-actions">
         <button className="draft-cancel" onClick={onCancel}>Cancel</button>
-      </div>
-    </div>
-  )
-}
-
-export function CreateTaskForm({ teamId, initialName, onCreate, onCancel, busy }) {
-  const [name, setName] = useState(initialName || '')
-  const [recents, setRecents] = useState([])
-  const [picked, setPicked] = useState(null)
-  const [allLists, setAllLists] = useState(null) // null = not loaded
-  const [listQuery, setListQuery] = useState('')
-  const [browsing, setBrowsing] = useState(false)
-  const [listsLoading, setListsLoading] = useState(false)
-
-  useEffect(() => {
-    Promise.all([
-      window.api.store.get('recent_lists'),
-      window.api.store.get('last_list'),
-    ]).then(([saved, last]) => {
-      const seen = new Set()
-      const merged = [...(saved || []), ...(last ? [last] : [])]
-        .filter(l => l?.id && !seen.has(l.id) && seen.add(l.id))
-        .slice(0, 4)
-      setRecents(merged)
-      if (merged[0]) setPicked(merged[0])
-    })
-  }, [])
-
-  async function browseAll() {
-    setBrowsing(true)
-    if (allLists === null) {
-      setListsLoading(true)
-      try {
-        setAllLists(await getAllLists(teamId))
-      } catch {
-        setAllLists([])
-      } finally {
-        setListsLoading(false)
-      }
-    }
-  }
-
-  async function submit() {
-    const n = name.trim()
-    if (!n || !picked) return
-    const seen = new Set([picked.id])
-    const nextRecents = [
-      { id: picked.id, name: picked.name },
-      ...recents.filter(l => !seen.has(l.id)),
-    ].slice(0, 4)
-    window.api.store.set('recent_lists', nextRecents)
-    await onCreate(picked.id, n)
-  }
-
-  const q = listQuery.trim().toLowerCase()
-  const filtered = (allLists || [])
-    .filter(l => !q || l.name.toLowerCase().includes(q) || l.path.toLowerCase().includes(q))
-    .slice(0, 8)
-
-  return (
-    <div className="entry-card-form">
-      <input
-        className="draft-input"
-        autoFocus
-        placeholder="Task name"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') submit()
-          if (e.key === 'Escape') onCancel()
-        }}
-      />
-      <div className="create-list-row">
-        <span className="create-list-label">in</span>
-        {recents.map(l => (
-          <button
-            key={l.id}
-            className={`create-list-chip ${picked?.id === l.id ? 'create-list-chip-active' : ''}`}
-            onClick={() => { setPicked(l); setBrowsing(false) }}
-          >
-            {l.name}
-          </button>
-        ))}
-        <button
-          className={`create-list-chip ${browsing || (picked && !recents.some(l => l.id === picked.id)) ? 'create-list-chip-active' : ''}`}
-          onClick={browseAll}
-        >
-          {picked && !recents.some(l => l.id === picked.id) ? picked.name : 'All lists…'}
-        </button>
-      </div>
-      {browsing && (
-        <>
-          <input
-            className="draft-input"
-            placeholder="Filter lists…"
-            value={listQuery}
-            onChange={e => setListQuery(e.target.value)}
-          />
-          <div className="edit-task-results">
-            {listsLoading && <div className="edit-task-empty">Loading lists…</div>}
-            {!listsLoading && filtered.length === 0 && <div className="edit-task-empty">No lists found.</div>}
-            {filtered.map(l => (
-              <button
-                key={l.id}
-                className="edit-task-result"
-                onClick={() => { setPicked({ id: l.id, name: l.name }); setBrowsing(false) }}
-              >
-                <span className="edit-task-result-name">{l.name}</span>
-                <span className="edit-task-result-meta">{l.path}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <div className="draft-actions">
-        <button className="draft-cancel" onClick={onCancel}>Cancel</button>
-        <button className="draft-save" onClick={submit} disabled={busy || !name.trim() || !picked}>
-          {busy ? 'Creating…' : `Create${picked ? ` in ${picked.name}` : ''}`}
-        </button>
       </div>
     </div>
   )

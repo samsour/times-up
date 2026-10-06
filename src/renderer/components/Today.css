@@ -318,43 +318,6 @@
   margin-top: 8px;
 }
 
-.create-list-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.create-list-label {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-right: 2px;
-}
-
-.create-list-chip {
-  padding: 3px 10px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-dim);
-  background: var(--bg-hover);
-  border-radius: 999px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: all 0.12s;
-}
-
-.create-list-chip:hover {
-  color: var(--text);
-  filter: brightness(1.1);
-}
-
-.create-list-chip-active {
-  color: var(--accent-text);
-  background: var(--accent);
-}
-
 .today-header-right {
   display: flex;
   align-items: center;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createTimeEntry, updateTimeEntry, deleteTimeEntry, searchTasks, startTimer, stopTimer, getCurrentTimer, createTask } from '../lib/clickup.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
-import { CreateTaskForm } from './Today.jsx'
+import { CreateTaskForm } from './CreateTask.jsx'
 import { formatDurationShort, formatTime, startOfDay } from '../lib/time.js'
 import './Timetable.css'
 
