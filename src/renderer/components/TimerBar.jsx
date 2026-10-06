@@ -367,7 +367,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                   <button
                     className="suggestion-browse"
                     onMouseDown={e => e.preventDefault()}
-                    onClick={() => { setOpen(false); onBrowse(q ? text.trim() : '') }}
+                    onClick={() => { setOpen(false); onBrowse() }}
                   >
                     Browse all tasks →
                   </button>
