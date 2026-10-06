@@ -15,6 +15,9 @@ const HOUR_MS = 3600000
 const DAY_MS = 24 * HOUR_MS
 const COLS_X = LABEL_W + 6
 const DAY_GAP = 4 // horizontal gap between day columns in multi-day mode
+// Shortest a block is drawn: one line of text plus the block's padding and
+// borders. Short entries overrun their true length rather than go unreadable
+const MIN_BLOCK_PX = 24
 
 function snap(ms, step = SNAP_MS) {
   return Math.round(ms / step) * step
@@ -774,7 +777,7 @@ export default function Timetable({
               lanes = []
             }
             for (const b of sorted) {
-              // treat blocks as at least one slot tall so the 18px minimum height can't hide anything
+              // treat blocks as at least one slot tall so the minimum block height can't hide anything
               const effEnd = Math.max(b.blockEnd, b.blockStart + gridMs)
               if (cluster.length && b.blockStart >= Math.max(...lanes)) finalize()
               let lane = lanes.findIndex(end => end <= b.blockStart)
@@ -795,7 +798,7 @@ export default function Timetable({
               const startOff = blockStart - d
               const endOff = Math.min(blockEnd - d, DAY_MS)
               const top = offToY(startOff)
-              const height = Math.max(offToY(endOff) - top, 18)
+              const height = Math.max(offToY(endOff) - top, MIN_BLOCK_PX)
               const label = entry.task?.name || entry.description || 'Untitled'
               const subW = (dayW - 6) / laneCount
               const left = dayX(di) + lane * subW
@@ -834,7 +837,7 @@ export default function Timetable({
                   onMouseEnter={() => { setHoveredBlockId(entry.id); onHoverBlock?.(blockKey(entry)) }}
                   onMouseLeave={() => { setHoveredBlockId(null); onHoverBlock?.(null) }}
                 >
-                  {height >= 18 && (
+                  {height >= MIN_BLOCK_PX && (
                     <span className="timetable-block-name">
                       {cont && <span className="timetable-block-cont-hint">↰ </span>}
                       {label}
