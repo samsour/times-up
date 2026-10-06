@@ -108,6 +108,31 @@
   color: var(--text-muted);
 }
 
+.timer-bar-input-closable {
+  padding-right: 30px;
+}
+
+.timer-bar-input-close {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  transition: all 0.12s;
+}
+
+.timer-bar-input-close:hover {
+  color: var(--text);
+  background: var(--accent-dim);
+}
+
 .timer-bar-note {
   background: transparent;
 }

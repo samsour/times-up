@@ -280,7 +280,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
             <>
               <input
                 ref={inputRef}
-                className={`timer-bar-input ${noteMode ? 'timer-bar-note' : ''}`}
+                className={`timer-bar-input ${noteMode ? 'timer-bar-note' : ''} ${switching ? 'timer-bar-input-closable' : ''}`}
                 placeholder={noteMode
                   ? 'What are you working on? Pick a task or leave a note'
                   : isRunning ? 'Switch task…' : pomoOn ? 'What will you focus on?' : 'Start a task or note…'}
@@ -292,6 +292,16 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                 autoFocus={switching}
                 maxLength={noteMode ? 200 : undefined}
               />
+              {switching && (
+                <button
+                  className="timer-bar-input-close"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setSwitching(false); setQuery(''); setOpen(false) }}
+                  title="Keep the current task (Esc)"
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                </button>
+              )}
               {creating && (
                 <div className="timer-bar-dropdown timer-bar-create">
                   <CreateTaskForm
