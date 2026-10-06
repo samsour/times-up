@@ -147,6 +147,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
     return {
       className: `picker-item ${i === highlight ? 'picker-item-active' : ''}`,
       onMouseEnter: () => setHighlight(i),
+      onMouseDown: e => e.preventDefault(), // keep focus in the search field
     }
   }
 
@@ -158,6 +159,25 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
     listRef.current?.querySelector('.picker-item-active')?.scrollIntoView({ block: 'nearest' })
   }, [highlight])
 
+  // Keys work wherever focus sits in the picker, except inside the other
+  // text fields (new task name, create form), which have their own keys
+  const searchRef = useRef(null)
+  useEffect(() => {
+    function onKey(e) {
+      const t = e.target
+      const inOtherField = (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && t !== searchRef.current
+      if (inOtherField || creating || newName !== null) return
+      if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', 'Backspace', 'Escape'].includes(e.key)) {
+        // Typing anywhere searches
+        if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && t !== searchRef.current) searchRef.current?.focus()
+        return
+      }
+      handleKeys(e)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  })
+
   function handleKeys(e) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -166,7 +186,8 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
       e.preventDefault()
       setHighlight(h => Math.max(h - 1, 0))
     } else if (e.key === 'Enter' || e.key === 'ArrowRight') {
-      if (rows[highlight]) { e.preventDefault(); rows[highlight].run() }
+      // A focused row button would also fire its own click on Enter
+      if (rows[highlight]) { e.preventDefault(); e.stopPropagation(); rows[highlight].run() }
     } else if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && !search) {
       // Up one level, like a folder tree
       if (crumbs.length > 1) { e.preventDefault(); jumpTo(crumbs.length - 2) }
@@ -194,7 +215,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
             placeholder="Search tasks"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            onKeyDown={handleKeys}
+            ref={searchRef}
             autoFocus
           />
           {search && (
