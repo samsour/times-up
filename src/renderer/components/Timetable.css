@@ -193,12 +193,16 @@
   transition: none;
 }
 
+/* Resize zones sit only around the nudge in the middle of each edge;
+   grabbing a block anywhere else moves it */
 .timetable-block-resize-handle {
   position: absolute;
   bottom: 0;
-  left: 0;
-  right: 0;
-  height: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  max-width: 60%;
+  height: 9px;
   cursor: ns-resize;
 }
 
@@ -225,9 +229,11 @@
 .timetable-block-start-handle {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
-  height: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  max-width: 60%;
+  height: 9px;
   cursor: ns-resize;
 }
 
