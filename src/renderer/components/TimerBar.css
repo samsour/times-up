@@ -280,15 +280,37 @@
   max-width: 100%;
 }
 
+/* Second line: list on the left, status on the right. Recency is the sort
+   order, not a label */
 .suggestion-row-meta {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  width: 100%;
   font-size: 11px;
   color: var(--text-muted);
 }
 
-.suggestion-row-recent {
-  font-style: italic;
+.suggestion-row-list {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.suggestion-row-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
 }
 
 .suggestion-note {

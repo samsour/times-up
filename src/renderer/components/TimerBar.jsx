@@ -199,23 +199,20 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   const noMatch = q.length > 0 && searchSettled && taskItems.length === 0
   // Row order mirrors the render. With matches: optional "start unassigned",
   // then the tasks. With none: "create" first, then "start unassigned"
-  // Browse is always the last row, so every row is reachable by keyboard
-  const rowCount = (noMatch
-    ? 1 + (showStartNote ? 1 : 0)
-    : (showStartNote ? 1 : 0) + taskItems.length) + 1
+  // Row order, which the keyboard follows: what the search produced first
+  // (the tasks, or the create row when nothing matched), then "start
+  // unassigned" as the fallback, then browse. Enter on the first row is
+  // therefore the most likely intent
+  const rowCount = (noMatch ? 1 : taskItems.length) + (showStartNote ? 1 : 0) + 1
   const browseIdx = rowCount - 1
+  const noteIdx = showStartNote ? browseIdx - 1 : -1
   const browse = () => { setOpen(false); onBrowse(taskItems.length > 0 ? text.trim() : '') }
 
   function rowAction(idx) {
     if (idx === browseIdx) return browse
-    if (noMatch) {
-      if (idx === 0) return () => { setOpen(false); setCreating(true) }
-      if (showStartNote && idx === 1) return () => startUnassigned(text.trim())
-      return null
-    }
-    if (showStartNote && idx === 0) return () => startUnassigned(text.trim())
-    const taskIdx = idx - (showStartNote ? 1 : 0)
-    if (taskIdx < taskItems.length) return () => pickTask(taskItems[taskIdx])
+    if (idx === noteIdx) return () => startUnassigned(text.trim())
+    if (noMatch) return idx === 0 ? () => { setOpen(false); setCreating(true) } : null
+    if (idx < taskItems.length) return () => pickTask(taskItems[idx])
     return null
   }
 
@@ -340,59 +337,46 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                         <span className="suggestion-row-icon"><PlusIcon /></span>
                         <span className="suggestion-row-name">Create task “{text.trim()}”</span>
                       </button>
-                      {showStartNote && (
-                        <button
-                          className={`suggestion-row suggestion-row-action ${highlight === 1 ? 'suggestion-row-active' : ''}`}
-                          onMouseDown={e => e.preventDefault()}
-                          onMouseEnter={() => setHighlight(1)}
-                          onClick={() => startUnassigned(text.trim())}
-                          disabled={busy}
-                        >
-                          <span className="suggestion-row-icon"><PlayIcon /></span>
-                          <span className="suggestion-row-name">Start unassigned “{text.trim()}”</span>
-                        </button>
-                      )}
                     </>
                   ) : (
                     <>
-                      {showStartNote && (
+                      {taskItems.map((task, i) => (
                         <button
-                          className={`suggestion-row suggestion-row-action ${highlight === 0 ? 'suggestion-row-active' : ''}`}
+                          key={task.id}
+                          className={`suggestion-row ${highlight === i ? 'suggestion-row-active' : ''}`}
                           onMouseDown={e => e.preventDefault()}
-                          onMouseEnter={() => setHighlight(0)}
-                          onClick={() => startUnassigned(text.trim())}
+                          onMouseEnter={() => setHighlight(i)}
+                          onClick={() => pickTask(task)}
                           disabled={busy}
                         >
-                          <span className="suggestion-row-icon"><PlayIcon /></span>
-                          <span className="suggestion-row-name">Start unassigned “{text.trim()}”</span>
+                          <span className="suggestion-row-name">{task.name}</span>
+                          <span className="suggestion-row-meta">
+                            <span className="suggestion-row-list">{task.list || '—'}</span>
+                            {task.status && (
+                              <span className="suggestion-row-status">
+                                <span className="suggestion-row-dot" style={{ background: task.statusColor || 'var(--text-muted)' }} />
+                                {task.status}
+                              </span>
+                            )}
+                          </span>
                         </button>
-                      )}
-                      {taskItems.map((task, i) => {
-                        const idx = i + (showStartNote ? 1 : 0)
-                        return (
-                          <button
-                            key={task.id}
-                            className={`suggestion-row ${highlight === idx ? 'suggestion-row-active' : ''}`}
-                            onMouseDown={e => e.preventDefault()}
-                            onMouseEnter={() => setHighlight(idx)}
-                            onClick={() => pickTask(task)}
-                            disabled={busy}
-                          >
-                            <span className="suggestion-row-name">{task.name}</span>
-                            <span className="suggestion-row-meta">
-                              {task.recent && <span className="suggestion-row-recent">recent</span>}
-                              {task.list && <span>{task.list}</span>}
-                              {task.status && (
-                                <span style={{ color: task.statusColor || undefined }}>{task.status}</span>
-                              )}
-                            </span>
-                          </button>
-                        )
-                      })}
+                      ))}
                       {q && !searchSettled && taskItems.length === 0 && (
                         <div className="suggestion-note">Searching…</div>
                       )}
                     </>
+                  )}
+                  {showStartNote && (
+                    <button
+                      className={`suggestion-row suggestion-row-action ${highlight === noteIdx ? 'suggestion-row-active' : ''}`}
+                      onMouseDown={e => e.preventDefault()}
+                      onMouseEnter={() => setHighlight(noteIdx)}
+                      onClick={() => startUnassigned(text.trim())}
+                      disabled={busy}
+                    >
+                      <span className="suggestion-row-icon"><PlayIcon /></span>
+                      <span className="suggestion-row-name">Start unassigned “{text.trim()}”</span>
+                    </button>
                   )}
                   {/* Carry the query over when it found something, so the
                       same results get the roomier list; a miss starts clean */}
