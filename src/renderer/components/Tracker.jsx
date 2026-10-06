@@ -8,7 +8,7 @@ import Settings from './Settings.jsx'
 import IdlePrompt from './IdlePrompt.jsx'
 import Planning from './Planning.jsx'
 import Focus from './Focus.jsx'
-import { getCurrentTimer, startTimer, updateTimeEntry, advanceTaskStatus, updateTask, getTeamMembers, canViewOthersTime, getTask } from '../lib/clickup.js'
+import { getCurrentTimer, startTimer, updateTimeEntry, advanceTaskStatus, updateTask, getTeamMembers, canViewOthersTime, getTask, assignMe, unassignMe } from '../lib/clickup.js'
 import './Tracker.css'
 
 // Which surface this renderer runs in: the menu bar popover (hides on blur,
@@ -136,34 +136,43 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
     toastTimer.current = setTimeout(() => setToast(null), 6000)
   }
 
-  // When time lands on a backlog task, move it to "in progress" so the
-  // board reflects reality for the whole team. Toggleable in Settings.
+  // When time lands on a task, make the board reflect it: a backlog task
+  // moves to "in progress" and I become an assignee if I'm not one. Both
+  // are toggleable in Settings and undoable from one toast.
   const handleTaskTracked = useCallback(async (taskId) => {
     if (!taskId) return
-    // Remember the task's list: "+ Create" offers it as the default home
-    // for new tasks in the timer bar, Focus and the timetable popups
-    getTask(taskId)
-      .then(t => { if (t?.list?.id) window.api.store.set('last_list', { id: t.list.id, name: t.list.name }) })
-      .catch(() => {})
-    try {
-      const enabled = await window.api.store.get('auto_progress')
-      if (enabled === false) return
-      const change = await advanceTaskStatus(taskId)
-      if (!change) return
-      bumpRefresh()
-      showToast({
-        text: `“${change.name}” moved to ${change.to}`,
-        undo: async () => {
-          try {
-            await updateTask(taskId, { status: change.from })
-          } catch {}
-          setToast(null)
-          bumpRefresh()
-        },
-      })
-    } catch {}
+    let task = null
+    try { task = await getTask(taskId) } catch { return }
+    // Remember the task's list: the new-task form starts on it
+    if (task?.list?.id) window.api.store.set('last_list', { id: task.list.id, name: task.list.name })
+
+    const [progressOn, assignOn] = await Promise.all([
+      window.api.store.get('auto_progress'),
+      window.api.store.get('auto_assign'),
+    ])
+    let status = null
+    let assigned = null
+    try { if (progressOn !== false) status = await advanceTaskStatus(taskId, task) } catch {}
+    try { if (assignOn !== false && userId) assigned = await assignMe(taskId, userId, task) } catch {}
+    if (!status && !assigned) return
+    bumpRefresh()
+
+    const parts = []
+    if (status) parts.push(`moved to ${status.to}`)
+    if (assigned) parts.push('assigned to you')
+    showToast({
+      text: `“${task.name}” ${parts.join(', ')}`,
+      undo: async () => {
+        try {
+          if (status) await updateTask(taskId, { status: status.from })
+          if (assigned) await unassignMe(taskId, userId)
+        } catch {}
+        setToast(null)
+        bumpRefresh()
+      },
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [userId])
 
   async function handleBrowsePick(task) {
     try {

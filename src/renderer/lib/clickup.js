@@ -162,8 +162,8 @@ export async function getListColors(teamId) {
 
 // If the task still sits in a backlog-type status ("open"), move it to the
 // list's in-progress-like status. Returns the change for undo, or null.
-export async function advanceTaskStatus(taskId) {
-  const task = await getTask(taskId);
+export async function advanceTaskStatus(taskId, task = null) {
+  task = task || (await getTask(taskId));
   if (!task?.status || task.status.type !== "open") return null;
   const statuses = await getListStatuses(task.list?.id);
   const target =
@@ -172,6 +172,20 @@ export async function advanceTaskStatus(taskId) {
   if (!target) return null;
   await updateTask(taskId, { status: target.status });
   return { taskId, name: task.name, from: task.status.status, to: target.status };
+}
+
+// Tracking time on a task means working on it: add me as an assignee if
+// I'm not one yet. Never removes anyone; leaves closed tasks alone.
+export async function assignMe(taskId, userId, task = null) {
+  task = task || (await getTask(taskId));
+  if (!task || task.status?.type === "closed") return null;
+  if ((task.assignees || []).some((a) => String(a.id) === String(userId))) return null;
+  await updateTask(taskId, { assignees: { add: [Number(userId)] } });
+  return { taskId, name: task.name };
+}
+
+export async function unassignMe(taskId, userId) {
+  return updateTask(taskId, { assignees: { rem: [Number(userId)] } });
 }
 
 // Time tracking

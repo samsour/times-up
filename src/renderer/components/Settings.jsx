@@ -61,6 +61,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
   const [weeklyGoalHours, setWeeklyGoalHours] = useState('')
   const [workdays, setWorkdays] = useState([1, 2, 3, 4, 5]) // getDay() numbers
   const [autoProgress, setAutoProgress] = useState(true)
+  const [autoAssign, setAutoAssign] = useState(true)
   const [updateState, setUpdateState] = useState('idle')
   const [versions, setVersions] = useState({ current: '', available: null })
   const [exportPreset, setExportPreset] = useState('week') // 'week' | 'month' | 'custom'
@@ -108,6 +109,7 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
       setWorkdays(g.workdays)
     })
     window.api.store.get('auto_progress').then(v => setAutoProgress(v !== false))
+    window.api.store.get('auto_assign').then(v => setAutoAssign(v !== false))
     window.api.updater.getState().then(setUpdateState)
     window.api.updater.getVersions().then(setVersions)
     window.api.store.get('archive_urls').then(v => {
@@ -551,6 +553,21 @@ export default function Settings({ teamId, theme, onThemeChange, font, onFontCha
               const next = !autoProgress
               setAutoProgress(next)
               await window.api.store.set('auto_progress', next)
+            }}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
+        </div>
+        <div className="settings-row">
+          <span className="settings-row-title" title="Tracking time on a task adds you as an assignee if you are not one yet. Nobody is ever removed; closed tasks are left alone. Undo is in the toast">
+            Assign me when I track
+          </span>
+          <button
+            className={`settings-toggle ${autoAssign ? 'settings-toggle-on' : ''}`}
+            onClick={async () => {
+              const next = !autoAssign
+              setAutoAssign(next)
+              await window.api.store.set('auto_assign', next)
             }}
           >
             <span className="settings-toggle-knob" />
