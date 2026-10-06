@@ -283,10 +283,12 @@ export default function Timetable({
   }
 
   // ── magnet: edges of neighbouring entries attract a dragged edge ─────────
-  // Start and end of every other entry on the day, as drag targets
+  // Start and end of every other entry on the day, plus the current time on
+  // today, as drag targets
   function edgesOnDay(day, excludeId) {
     const out = []
     const dEnd = day + DAY_MS
+    if (now >= day && now < dEnd) out.push(now)
     for (const e of entries || []) {
       if (e.id === excludeId) continue
       const s = parseInt(e.start)
