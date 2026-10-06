@@ -11,6 +11,9 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
   const [error, setError] = useState('')
 
   const { tasks: searchResults, settled } = useTaskSuggestions(teamId, userId, search, { limit: 12 })
+  // With no query the hook yields recent and assigned tasks: a shortcut
+  // row at the top level, before drilling into spaces
+  const recent = !search.trim() ? searchResults.slice(0, 5) : []
 
   const current = crumbs[crumbs.length - 1]
 
@@ -76,18 +79,30 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
   return (
     <div className="picker">
       <div className="picker-bar">
-        <button className="picker-back" onClick={onCancel}>
+        <button className="picker-back" onClick={onCancel} title="Back">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
-        <input
-          className="picker-search"
-          placeholder="Search tasks..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          autoFocus
-        />
+        <div className="picker-search-wrap">
+          <svg className="picker-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
+          <input
+            className="picker-search"
+            placeholder="Search tasks"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') { if (search) setSearch(''); else onCancel() } }}
+            autoFocus
+          />
+          {search && (
+            <button className="picker-search-clear" onClick={() => setSearch('')} title="Clear">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {!isSearching && (
@@ -108,32 +123,59 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
 
       <div className="picker-list">
         {/* Normal drill-down mode */}
-        {!isSearching && loading && <div className="picker-loading">Loading…</div>}
+        {!isSearching && current.type === 'team' && recent.length > 0 && (
+          <>
+            <div className="picker-section">Recent</div>
+            {recent.map(task => (
+              <button key={task.id} className="picker-item" onClick={() => onPick({ id: task.id, name: task.name })}>
+                <span className="picker-icon picker-icon-task">{iconFor('task')}</span>
+                <span className="picker-item-info">
+                  <span className="picker-item-name">{task.name}</span>
+                  {task.list && <span className="picker-item-context">{task.list}</span>}
+                </span>
+                {task.status && <StatusPill status={task.status} color={task.statusColor} />}
+              </button>
+            ))}
+          </>
+        )}
+        {!isSearching && loading && (
+          <div className="picker-skeleton">
+            {[0, 1, 2, 3].map(i => <div key={i} className="picker-skeleton-row" style={{ opacity: 1 - i * 0.2 }} />)}
+          </div>
+        )}
         {!isSearching && error && <div className="picker-error">{error}</div>}
         {!isSearching && !loading && !error && items.length === 0 && (
           <div className="picker-empty">Nothing in here.</div>
         )}
-        {!isSearching && !loading && items.map(item => (
-          <button key={`${item.kind}-${item.id}`} className="picker-item" onClick={() => drill(item)}>
-            <span className={`picker-icon picker-icon-${item.kind}`}>{iconFor(item.kind)}</span>
-            <span className="picker-item-name">{item.name}</span>
-            {item.status && (
-              <span className="picker-status" style={{ color: item.statusColor || 'var(--text-muted)' }}>
-                {item.status}
-              </span>
-            )}
-            {item.kind !== 'task' && (
-              <svg className="picker-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
-            )}
-          </button>
+        {!isSearching && !loading && !error && groupItems(items, current.type).map(group => (
+          <div key={group.label}>
+            <div className="picker-section">{group.label}</div>
+            {group.items.map(item => (
+              <button key={`${item.kind}-${item.id}`} className="picker-item" onClick={() => drill(item)}>
+                <span
+                  className={`picker-icon picker-icon-${item.kind}`}
+                  style={item.color ? { background: `color-mix(in srgb, ${item.color} 18%, transparent)`, color: item.color } : undefined}
+                >
+                  {iconFor(item.kind)}
+                </span>
+                <span className="picker-item-name">{item.name}</span>
+                {item.status && <StatusPill status={item.status} color={item.statusColor} />}
+                {item.kind !== 'task' && (
+                  <svg className="picker-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
         ))}
 
         {/* Search results mode: local matches render instantly and stay
             visible while the server search tops the list up */}
         {isSearching && !settled && searchResults.length === 0 && (
-          <div className="picker-loading">Searching…</div>
+          <div className="picker-skeleton">
+            {[0, 1, 2].map(i => <div key={i} className="picker-skeleton-row" style={{ opacity: 1 - i * 0.25 }} />)}
+          </div>
         )}
         {isSearching && settled && searchResults.length === 0 && (
           <div className="picker-empty">No tasks found.</div>
@@ -149,16 +191,37 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
               <span className="picker-item-name">{task.name}</span>
               {task.list && <span className="picker-item-context">{task.list}</span>}
             </span>
-            {task.status && (
-              <span className="picker-status" style={{ color: task.statusColor || 'var(--text-muted)' }}>
-                {task.status}
-              </span>
-            )}
+            {task.status && <StatusPill status={task.status} color={task.statusColor} />}
           </button>
         ))}
       </div>
     </div>
   )
+}
+
+// Status as a coloured dot plus quiet text, not a shouting box
+function StatusPill({ status, color }) {
+  return (
+    <span className="picker-status">
+      <span className="picker-status-dot" style={{ background: color || 'var(--text-muted)' }} />
+      {status}
+    </span>
+  )
+}
+
+// Section headings per level, so a space shows its folders and lists apart
+function groupItems(items, level) {
+  if (level === 'team') return [{ label: 'Spaces', items }]
+  if (level === 'space') {
+    const folders = items.filter(i => i.kind === 'folder')
+    const lists = items.filter(i => i.kind === 'list')
+    return [
+      ...(folders.length ? [{ label: 'Folders', items: folders }] : []),
+      ...(lists.length ? [{ label: 'Lists', items: lists }] : []),
+    ]
+  }
+  if (level === 'folder') return [{ label: 'Lists', items }]
+  return [{ label: 'Tasks', items }]
 }
 
 function iconFor(kind) {
