@@ -56,6 +56,8 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
   const recent = !search.trim() ? searchResults.slice(0, 5) : []
 
   const current = crumbs[crumbs.length - 1]
+  const [highlight, setHighlight] = useState(0)
+  const listRef = useRef(null)
 
   useEffect(() => {
     loadCurrent()
@@ -122,6 +124,58 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
 
   const isSearching = search.trim().length > 0
 
+  // Every clickable row in render order, so the arrow keys can walk them
+  const rows = []
+  if (!isSearching) {
+    if (current.type === 'team') {
+      for (const t of recent) rows.push({ key: `recent-${t.id}`, run: () => onPick({ id: t.id, name: t.name }) })
+    }
+    if (!loading && !error) {
+      for (const g of groupItems(items, current.type)) {
+        if (g.label === 'Tasks' && newName === null) rows.push({ key: 'new', run: () => setNewName(defaultName) })
+        for (const item of g.items) rows.push({ key: `${item.kind}-${item.id}`, run: () => drill(item) })
+      }
+    }
+  } else if (!creating) {
+    for (const l of listMatches) rows.push({ key: `list-${l.id}`, run: () => openListFromSearch(l) })
+    for (const t of searchResults) rows.push({ key: `task-${t.id}`, run: () => onPick({ id: t.id, name: t.name }) })
+    if (settled) rows.push({ key: 'create', run: () => setCreating(true) })
+  }
+  const rowIdx = key => rows.findIndex(r => r.key === key)
+  const rowProps = key => {
+    const i = rowIdx(key)
+    return {
+      className: `picker-item ${i === highlight ? 'picker-item-active' : ''}`,
+      onMouseEnter: () => setHighlight(i),
+    }
+  }
+
+  // Back to the first row whenever the list changes under the cursor
+  useEffect(() => { setHighlight(0) }, [search, crumbs, items.length, searchResults.length])
+
+  // Keep the highlighted row in view
+  useEffect(() => {
+    listRef.current?.querySelector('.picker-item-active')?.scrollIntoView({ block: 'nearest' })
+  }, [highlight])
+
+  function handleKeys(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlight(h => Math.min(h + 1, rows.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlight(h => Math.max(h - 1, 0))
+    } else if (e.key === 'Enter' || e.key === 'ArrowRight') {
+      if (rows[highlight]) { e.preventDefault(); rows[highlight].run() }
+    } else if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && !search) {
+      // Up one level, like a folder tree
+      if (crumbs.length > 1) { e.preventDefault(); jumpTo(crumbs.length - 2) }
+    } else if (e.key === 'Escape') {
+      if (search) setSearch('')
+      else onCancel()
+    }
+  }
+
   return (
     <div className="picker">
       <div className="picker-bar">
@@ -140,7 +194,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
             placeholder="Search tasks"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Escape') { if (search) setSearch(''); else onCancel() } }}
+            onKeyDown={handleKeys}
             autoFocus
           />
           {search && (
@@ -167,13 +221,13 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
         </div>
       )}
 
-      <div className="picker-list">
+      <div className="picker-list" ref={listRef}>
         {/* Normal drill-down mode */}
         {!isSearching && current.type === 'team' && recent.length > 0 && (
           <>
             <div className="picker-section">Recent</div>
             {recent.map(task => (
-              <button key={task.id} className="picker-item" onClick={() => onPick({ id: task.id, name: task.name })}>
+              <button key={task.id} {...rowProps(`recent-${task.id}`)} onClick={() => onPick({ id: task.id, name: task.name })}>
                 <span className="picker-icon picker-icon-task">{iconFor('task')}</span>
                 <span className="picker-item-info">
                   <span className="picker-item-name">{task.name}</span>
@@ -198,7 +252,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
             <div className="picker-section">{group.label}</div>
             {group.label === 'Tasks' && (
               newName === null ? (
-                <button className="picker-item picker-item-create" onClick={() => setNewName(defaultName)}>
+                <button {...rowProps('new')} className={`${rowProps('new').className} picker-item-create`} onClick={() => setNewName(defaultName)}>
                   <span className="picker-icon picker-icon-create">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
                   </span>
@@ -228,7 +282,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
               )
             )}
             {group.items.map(item => (
-              <button key={`${item.kind}-${item.id}`} className="picker-item" onClick={() => drill(item)}>
+              <button key={`${item.kind}-${item.id}`} {...rowProps(`${item.kind}-${item.id}`)} onClick={() => drill(item)}>
                 <span
                   className={`picker-icon picker-icon-${item.kind}`}
                   style={item.color ? { background: `color-mix(in srgb, ${item.color} 18%, transparent)`, color: item.color } : undefined}
@@ -269,7 +323,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
           <>
             <div className="picker-section">Lists</div>
             {listMatches.map(l => (
-              <button key={`list-${l.id}`} className="picker-item" onClick={() => openListFromSearch(l)} title={`Open ${l.name}; the text becomes the new task's name`}>
+              <button key={`list-${l.id}`} {...rowProps(`list-${l.id}`)} onClick={() => openListFromSearch(l)} title={`Open ${l.name}; the text becomes the new task's name`}>
                 <span className="picker-icon picker-icon-list" style={l.color ? { background: `color-mix(in srgb, ${l.color} 18%, transparent)`, color: l.color } : undefined}>{iconFor('list')}</span>
                 <span className="picker-item-info">
                   <span className="picker-item-name">{l.name}</span>
@@ -284,7 +338,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
         {isSearching && !creating && searchResults.map(task => (
           <button
             key={task.id}
-            className="picker-item"
+            {...rowProps(`task-${task.id}`)}
             onClick={() => onPick({ id: task.id, name: task.name })}
           >
             <span className="picker-icon picker-icon-task">{iconFor('task')}</span>
@@ -298,7 +352,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
         {isSearching && !creating && settled && (
           <>
             {searchResults.length === 0 && <div className="picker-empty">No task called “{search.trim()}”.</div>}
-            <button className="picker-item picker-item-create" onClick={() => setCreating(true)} disabled={busy}>
+            <button {...rowProps('create')} className={`${rowProps('create').className} picker-item-create`} onClick={() => setCreating(true)} disabled={busy}>
               <span className="picker-icon picker-icon-create">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
               </span>

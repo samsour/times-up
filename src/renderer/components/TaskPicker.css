@@ -208,11 +208,13 @@
   transition: background 0.1s;
 }
 
-.picker-item:hover {
+.picker-item:hover,
+.picker-item-active {
   background: var(--bg-hover);
 }
 
-.picker-item:hover .picker-chev {
+.picker-item:hover .picker-chev,
+.picker-item-active .picker-chev {
   color: var(--text-dim);
   transform: translateX(2px);
 }
