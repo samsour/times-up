@@ -11,6 +11,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const store = new Store()
 
 app.setName('TimesUp')
+// Windows shows this on toast notifications; it must match the installer's
+// appId or the toast is headed "electron.app.TimesUp" in a fallback style
+if (process.platform === 'win32') app.setAppUserModelId('com.krekeny.timesup')
 
 let tray = null
 let win = null
