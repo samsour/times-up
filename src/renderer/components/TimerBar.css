@@ -177,9 +177,11 @@
 
 /* dropdown */
 
-.timer-bar-create {
+/* The create form hosts its own list dropdown, so it must not clip or scroll */
+.timer-bar-dropdown.timer-bar-create {
   padding: 10px;
   overflow: visible;
+  max-height: none;
 }
 
 .timer-bar-dropdown {
