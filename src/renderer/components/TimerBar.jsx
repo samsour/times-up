@@ -21,7 +21,6 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
-  const [lastList, setLastList] = useState(null)
   const [editingStart, setEditingStart] = useState(false)
   const [startEdit, setStartEdit] = useState('')
   const [switching, setSwitching] = useState(false)
@@ -74,8 +73,6 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
 
   useEffect(() => {
     getGoals().then(g => setCapacity(g.dailyMs))
-    window.api.store.get('last_list').then(l => l && setLastList(l))
-    return window.api.store.onChange(({ key, value }) => { if (key === 'last_list' && value) setLastList(value) })
   }, [])
 
   useEffect(() => {
@@ -144,7 +141,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
     }
   }
 
-  async function handleCreateTask(listId = lastList?.id, name = text.trim()) {
+  async function handleCreateTask(listId, name) {
     if (!name || !listId) return
     setBusy(true)
     try {
@@ -199,15 +196,22 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
 
   const q = text.trim().toLowerCase()
   const showStartNote = !isRunning && q.length > 0
-  const showCreate = q && searchSettled && taskItems.length === 0 && lastList
-  // Row order mirrors the render: optional note row, tasks, optional create row
-  const rowCount = (showStartNote ? 1 : 0) + taskItems.length + (showCreate ? 1 : 0)
+  const noMatch = q.length > 0 && searchSettled && taskItems.length === 0
+  // Row order mirrors the render. With matches: optional "start unassigned",
+  // then the tasks. With none: "create" first, then "start unassigned"
+  const rowCount = noMatch
+    ? 1 + (showStartNote ? 1 : 0)
+    : (showStartNote ? 1 : 0) + taskItems.length
 
   function rowAction(idx) {
+    if (noMatch) {
+      if (idx === 0) return () => { setOpen(false); setCreating(true) }
+      if (showStartNote && idx === 1) return () => startUnassigned(text.trim())
+      return null
+    }
     if (showStartNote && idx === 0) return () => startUnassigned(text.trim())
     const taskIdx = idx - (showStartNote ? 1 : 0)
     if (taskIdx < taskItems.length) return () => pickTask(taskItems[taskIdx])
-    if (showCreate) return handleCreateTask
     return null
   }
 
@@ -315,64 +319,69 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
               )}
               {open && !creating && (
                 <div className="timer-bar-dropdown">
-                  {showStartNote && (
-                    <button
-                      className={`suggestion-row ${highlight === 0 ? 'suggestion-row-active' : ''}`}
-                      onMouseDown={e => e.preventDefault()}
-                      onMouseEnter={() => setHighlight(0)}
-                      onClick={() => startUnassigned(text.trim())}
-                      disabled={busy}
-                    >
-                      <span className="suggestion-row-name">Start unassigned: “{text.trim()}”</span>
-                    </button>
-                  )}
-                  {taskItems.map((task, i) => {
-                    const idx = i + (showStartNote ? 1 : 0)
-                    return (
+                  {noMatch ? (
+                    <>
+                      <div className="suggestion-note">No task called “{text.trim()}”.</div>
                       <button
-                        key={task.id}
-                        className={`suggestion-row ${highlight === idx ? 'suggestion-row-active' : ''}`}
+                        className={`suggestion-row suggestion-row-create ${highlight === 0 ? 'suggestion-row-active' : ''}`}
                         onMouseDown={e => e.preventDefault()}
-                        onMouseEnter={() => setHighlight(idx)}
-                        onClick={() => pickTask(task)}
+                        onMouseEnter={() => setHighlight(0)}
+                        onClick={() => { setOpen(false); setCreating(true) }}
                         disabled={busy}
                       >
-                        <span className="suggestion-row-name">{task.name}</span>
-                        <span className="suggestion-row-meta">
-                          {task.recent && <span className="suggestion-row-recent">recent</span>}
-                          {task.list && <span>{task.list}</span>}
-                          {task.status && (
-                            <span style={{ color: task.statusColor || undefined }}>{task.status}</span>
-                          )}
-                        </span>
+                        <span className="suggestion-row-name">+ Create task “{text.trim()}”</span>
                       </button>
-                    )
-                  })}
-                  {q && !searchSettled && taskItems.length === 0 && (
-                    <div className="suggestion-note">Searching…</div>
-                  )}
-                  {q && searchSettled && taskItems.length === 0 && (
-                    <div className="suggestion-note">No task called “{text.trim()}”.</div>
-                  )}
-                  {showCreate && (
-                    <button
-                      className={`suggestion-row ${highlight === rowCount - 1 ? 'suggestion-row-active' : ''}`}
-                      onMouseDown={e => e.preventDefault()}
-                      onMouseEnter={() => setHighlight(rowCount - 1)}
-                      onClick={handleCreateTask}
-                      disabled={busy}
-                    >
-                      <span className="suggestion-row-name">+ Create “{text.trim()}” in {lastList.name}</span>
-                    </button>
-                  )}
-                  {q && searchSettled && (
-                    <button
-                      className="suggestion-browse"
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setOpen(false); setCreating(true) }}
-                    >
-                      {showCreate ? 'Create in another list…' : `+ Create “${text.trim()}”…`}
-                    </button>
+                      {showStartNote && (
+                        <button
+                          className={`suggestion-row ${highlight === 1 ? 'suggestion-row-active' : ''}`}
+                          onMouseDown={e => e.preventDefault()}
+                          onMouseEnter={() => setHighlight(1)}
+                          onClick={() => startUnassigned(text.trim())}
+                          disabled={busy}
+                        >
+                          <span className="suggestion-row-name">Start unassigned: “{text.trim()}”</span>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {showStartNote && (
+                        <button
+                          className={`suggestion-row ${highlight === 0 ? 'suggestion-row-active' : ''}`}
+                          onMouseDown={e => e.preventDefault()}
+                          onMouseEnter={() => setHighlight(0)}
+                          onClick={() => startUnassigned(text.trim())}
+                          disabled={busy}
+                        >
+                          <span className="suggestion-row-name">Start unassigned: “{text.trim()}”</span>
+                        </button>
+                      )}
+                      {taskItems.map((task, i) => {
+                        const idx = i + (showStartNote ? 1 : 0)
+                        return (
+                          <button
+                            key={task.id}
+                            className={`suggestion-row ${highlight === idx ? 'suggestion-row-active' : ''}`}
+                            onMouseDown={e => e.preventDefault()}
+                            onMouseEnter={() => setHighlight(idx)}
+                            onClick={() => pickTask(task)}
+                            disabled={busy}
+                          >
+                            <span className="suggestion-row-name">{task.name}</span>
+                            <span className="suggestion-row-meta">
+                              {task.recent && <span className="suggestion-row-recent">recent</span>}
+                              {task.list && <span>{task.list}</span>}
+                              {task.status && (
+                                <span style={{ color: task.statusColor || undefined }}>{task.status}</span>
+                              )}
+                            </span>
+                          </button>
+                        )
+                      })}
+                      {q && !searchSettled && taskItems.length === 0 && (
+                        <div className="suggestion-note">Searching…</div>
+                      )}
+                    </>
                   )}
                   {/* Carry the query over when it found something, so the
                       same results get the roomier list; a miss starts clean */}

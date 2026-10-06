@@ -155,17 +155,10 @@ export default function Timetable({
   const [editTaskText, setEditTaskText] = useState('')
   const [editTaskPicked, setEditTaskPicked] = useState(null)
   const [editTaskResults, setEditTaskResults] = useState(null)
-  // Where "+ Create" puts new tasks: the list last tracked against
-  const [lastList, setLastList] = useState(null)
-  useEffect(() => {
-    window.api.store.get('last_list').then(l => l && setLastList(l))
-    return window.api.store.onChange(({ key, value }) => { if (key === 'last_list' && value) setLastList(value) })
-  }, [])
-
-  // Which popup has the list picker open: 'edit' | 'draft' | null
+  // Which popup has the new-task form open: 'edit' | 'draft' | null
   const [creatingIn, setCreatingIn] = useState(null)
 
-  async function createTaskIn(name, listId = lastList?.id) {
+  async function createTaskIn(name, listId) {
     const task = await createTask(listId, name)
     onTaskTracked?.(task.id)
     return { id: task.id, name: task.name }
@@ -970,28 +963,13 @@ export default function Timetable({
                   ))}
                   {draftTaskQuery.trim() && draftSettled && draftSuggestions.length === 0 && (
                     <>
-                      {lastList && (
-                        <button
-                          className="edit-task-result edit-task-create"
-                          onMouseDown={e => e.preventDefault()}
-                          disabled={saving}
-                          onClick={async () => {
-                            setSaving(true)
-                            try {
-                              setDraftTask(await createTaskIn(draftTaskQuery.trim()))
-                              setDraftTaskQuery('')
-                            } catch (err) { alert(err.message) } finally { setSaving(false) }
-                          }}
-                        >
-                          <span className="edit-task-result-name">+ Create “{draftTaskQuery.trim()}” in {lastList.name}</span>
-                        </button>
-                      )}
+                      <div className="edit-task-empty">No task called “{draftTaskQuery.trim()}”.</div>
                       <button
                         className="edit-task-result edit-task-create"
                         onMouseDown={e => e.preventDefault()}
                         onClick={() => setCreatingIn('draft')}
                       >
-                        <span className="edit-task-result-name">{lastList ? 'Create in another list…' : `+ Create “${draftTaskQuery.trim()}” as a task…`}</span>
+                        <span className="edit-task-result-name">+ Create task “{draftTaskQuery.trim()}”</span>
                       </button>
                     </>
                   )}
@@ -1169,28 +1147,12 @@ export default function Timetable({
                   <div className="edit-task-results">
                     {editTaskResults.length === 0 && (
                       <>
-                        {lastList && (
-                          <button
-                            className="edit-task-result edit-task-create"
-                            disabled={saving}
-                            onClick={async () => {
-                              setSaving(true)
-                              try {
-                                const t = await createTaskIn(editTaskText.trim())
-                                setEditTaskPicked(t)
-                                setEditTaskText(t.name)
-                                setEditTaskResults(null)
-                              } catch (err) { alert(err.message) } finally { setSaving(false) }
-                            }}
-                          >
-                            <span className="edit-task-result-name">+ Create “{editTaskText.trim()}” in {lastList.name}</span>
-                          </button>
-                        )}
+                        <div className="edit-task-empty">No task called “{editTaskText.trim()}”.</div>
                         <button
                           className="edit-task-result edit-task-create"
                           onClick={() => { setCreatingIn('edit'); setEditTaskResults(null) }}
                         >
-                          <span className="edit-task-result-name">{lastList ? 'Create in another list…' : `+ Create “${editTaskText.trim()}” as a task…`}</span>
+                          <span className="edit-task-result-name">+ Create task “{editTaskText.trim()}”</span>
                         </button>
                       </>
                     )}

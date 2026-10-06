@@ -15,13 +15,8 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
   const [newName, setNewName] = useState(null) // inline "new task" row inside a list, null = closed
   const [creating, setCreating] = useState(false) // list picker form, from a search with no match
   const [busy, setBusy] = useState(false)
-  const [lastList, setLastList] = useState(null)
   const [allLists, setAllLists] = useState(null) // for matching lists while searching
   const pendingNewName = useRef(null) // name to offer once a list opened from a search has loaded
-
-  useEffect(() => {
-    window.api.store.get('last_list').then(l => l && setLastList(l))
-  }, [])
 
   // Lists are searchable too, loaded the first time a query is typed
   useEffect(() => {
@@ -303,22 +298,11 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', default
         {isSearching && !creating && settled && (
           <>
             {searchResults.length === 0 && <div className="picker-empty">No task called “{search.trim()}”.</div>}
-            {lastList && (
-              <button className="picker-item picker-item-create" onClick={() => createAndPick(lastList.id, search)} disabled={busy}>
-                <span className="picker-icon picker-icon-create">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
-                </span>
-                <span className="picker-item-info">
-                  <span className="picker-item-name">Create “{search.trim()}”</span>
-                  <span className="picker-item-context">in {lastList.name}</span>
-                </span>
-              </button>
-            )}
             <button className="picker-item picker-item-create" onClick={() => setCreating(true)} disabled={busy}>
               <span className="picker-icon picker-icon-create">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
               </span>
-              <span className="picker-item-name">{lastList ? 'Create in another list…' : `Create “${search.trim()}”…`}</span>
+              <span className="picker-item-name">Create task “{search.trim()}”</span>
             </button>
           </>
         )}

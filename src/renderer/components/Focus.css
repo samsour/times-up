@@ -263,6 +263,12 @@
   text-overflow: ellipsis;
 }
 
+.focus-recent-note {
+  padding: 8px 12px 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .focus-recent-create .focus-recent-name {
   color: var(--accent);
 }

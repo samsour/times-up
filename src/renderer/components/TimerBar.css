@@ -239,6 +239,11 @@
   background: var(--bg-hover);
 }
 
+.suggestion-row-create .suggestion-row-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .suggestion-row-name {
   font-size: 12.5px;
   font-weight: 500;
