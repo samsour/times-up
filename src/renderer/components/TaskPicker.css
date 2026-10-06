@@ -152,16 +152,41 @@
   color: var(--danger);
 }
 
+/* Placeholder rows shaped like the real ones: icon tile plus a text bar */
 .picker-skeleton {
-  padding: 8px 10px;
+  padding: 4px 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
 .picker-skeleton-row {
-  height: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+}
+
+.picker-skeleton-row::before {
+  content: '';
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.picker-skeleton-row::after {
+  content: '';
+  height: 13px;
+  width: 55%;
   border-radius: 6px;
+}
+
+.picker-skeleton-row:nth-child(2)::after { width: 40%; }
+.picker-skeleton-row:nth-child(3)::after { width: 65%; }
+.picker-skeleton-row:nth-child(4)::after { width: 48%; }
+
+.picker-skeleton-row::before,
+.picker-skeleton-row::after {
   background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-hover) 50%, var(--bg-elevated) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
