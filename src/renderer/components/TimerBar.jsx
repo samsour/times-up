@@ -328,6 +328,9 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                   {q && !searchSettled && taskItems.length === 0 && (
                     <div className="suggestion-note">Searching…</div>
                   )}
+                  {q && searchSettled && taskItems.length === 0 && (
+                    <div className="suggestion-note">No task called “{text.trim()}”.</div>
+                  )}
                   {showCreate && (
                     <button
                       className={`suggestion-row ${highlight === rowCount - 1 ? 'suggestion-row-active' : ''}`}
@@ -339,10 +342,19 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                       <span className="suggestion-row-name">+ Create “{text.trim()}” in {lastList.name}</span>
                     </button>
                   )}
+                  {q && searchSettled && (
+                    <button
+                      className="suggestion-browse"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => { setOpen(false); onBrowse(text.trim()) }}
+                    >
+                      {showCreate ? 'Create in another list…' : `+ Create “${text.trim()}”…`}
+                    </button>
+                  )}
                   <button
                     className="suggestion-browse"
                     onMouseDown={e => e.preventDefault()}
-                    onClick={() => { setOpen(false); onBrowse() }}
+                    onClick={() => { setOpen(false); onBrowse(q ? text.trim() : '') }}
                   >
                     Browse all tasks →
                   </button>

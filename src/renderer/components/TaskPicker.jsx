@@ -4,11 +4,11 @@ import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { CreateTaskForm } from './Today.jsx'
 import './TaskPicker.css'
 
-export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
+export default function TaskPicker({ teamId, userId, initialSearch = '', onPick, onCancel }) {
   const [crumbs, setCrumbs] = useState([{ type: 'team', name: 'Spaces' }])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialSearch)
   const [error, setError] = useState('')
   const [newName, setNewName] = useState(null) // inline "new task" row inside a list, null = closed
   const [creating, setCreating] = useState(false) // list picker form, from a search with no match
@@ -49,7 +49,7 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
   async function loadCurrent() {
     setLoading(true)
     setError('')
-    setSearch('')
+    if (crumbs.length > 1 || !initialSearch) setSearch('')
     setNewName(null)
     try {
       let result = []

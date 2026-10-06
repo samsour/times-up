@@ -26,7 +26,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   const [refreshKey, setRefreshKey] = useState(0)
   const [idleSeconds, setIdleSeconds] = useState(null)
   const [updateReady, setUpdateReady] = useState(false)
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false) // false | { query }
   const [toast, setToast] = useState(null) // { text, undo }
   const [isAdmin, setIsAdmin] = useState(false)
   const [pomo, setPomo] = useState(null)
@@ -218,7 +218,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
           userId={userId}
           currentEntry={currentEntry}
           pomo={pomo}
-          onBrowse={() => setPickerOpen(true)}
+          onBrowse={(query = '') => setPickerOpen({ query })}
           onChange={bumpRefresh}
           onTaskTracked={handleTaskTracked}
           onOpenFocus={() => setView('focus')}
@@ -269,6 +269,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
             <TaskPicker
               teamId={teamId}
               userId={userId}
+              initialSearch={pickerOpen.query || ''}
               onPick={handleBrowsePick}
               onCancel={() => setPickerOpen(false)}
             />
