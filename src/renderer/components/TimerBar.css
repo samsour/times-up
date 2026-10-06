@@ -53,6 +53,36 @@
   flex-shrink: 0;
 }
 
+/* Elapsed time with the start underneath; click to change the start */
+.timer-bar-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+  gap: 2px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s;
+}
+
+.timer-bar-clock:hover {
+  background: var(--bg-hover);
+}
+
+.timer-bar-clock-since {
+  font-family: var(--font-body);
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.timer-bar-clock:hover .timer-bar-clock-since {
+  color: var(--accent);
+}
+
 .timer-bar-middle {
   flex: 1;
   min-width: 0;
@@ -112,22 +142,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.timer-bar-since {
-  flex-shrink: 0;
-  padding: 4px 10px;
-  font-size: 11px;
-  color: var(--text-dim);
-  background: var(--bg-elevated);
-  border-radius: 999px;
-  white-space: nowrap;
-  transition: all 0.12s;
-}
-
-.timer-bar-since:hover {
-  color: var(--accent);
-  background: var(--accent-dim);
 }
 
 .timer-bar-since-edit {

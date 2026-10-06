@@ -6,7 +6,7 @@ import {
   getTimeEntries,
   createTask,
 } from '../lib/clickup.js'
-import { formatDuration, formatDurationShort, startOfDay, endOfDay } from '../lib/time.js'
+import { formatDuration, formatDurationShort, formatTime, startOfDay, endOfDay } from '../lib/time.js'
 import { getGoals } from '../lib/goals.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './TimerBar.css'
@@ -251,7 +251,14 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
         </button>
 
         {isRunning && !inFocus && (
-          <span className="timer-bar-time">{formatDuration(elapsed)}</span>
+          <button
+            className="timer-bar-time timer-bar-clock"
+            onClick={editingStart ? () => setEditingStart(false) : openStartEdit}
+            title={`Started ${formatTime(currentEntry.start)} · click to change`}
+          >
+            <span>{formatDuration(elapsed)}</span>
+            <span className="timer-bar-clock-since">since {formatTime(currentEntry.start)}</span>
+          </button>
         )}
         {inFocus && (
           <button className="timer-bar-time timer-bar-time-pomo" onClick={onOpenFocus} title={`Block ends in ${formatDuration(pomoLeft)} · ${formatDuration(elapsed)} tracked. Open Focus`}>
@@ -352,8 +359,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
           ) : null}
         </div>
 
-        {isRunning && !inFocus && (
-          editingStart ? (
+        {isRunning && !inFocus && editingStart && (
             <div className="timer-bar-since-edit">
               <input
                 type="datetime-local"
@@ -369,11 +375,6 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
               <button className="timer-bar-since-ok" onClick={saveStartEdit} disabled={busy}>✓</button>
               <button className="timer-bar-since-cancel" onClick={() => setEditingStart(false)}>✕</button>
             </div>
-          ) : (
-            <button className="timer-bar-since" onClick={openStartEdit} title="Edit start time">
-              since {new Date(parseInt(currentEntry.start)).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-            </button>
-          )
         )}
 
         <button
