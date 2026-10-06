@@ -9,6 +9,7 @@ import IdlePrompt from './IdlePrompt.jsx'
 import Planning from './Planning.jsx'
 import Focus from './Focus.jsx'
 import { getCurrentTimer, startTimer, updateTimeEntry, advanceTaskStatus, updateTask, getTeamMembers, canViewOthersTime, getTask, assignMe, unassignMe } from '../lib/clickup.js'
+import { usePopup } from '../lib/popups.js'
 import './Tracker.css'
 
 // Which surface this renderer runs in: the menu bar popover (hides on blur,
@@ -31,6 +32,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   const [isAdmin, setIsAdmin] = useState(false)
   const [pomo, setPomo] = useState(null)
   const toastTimer = useRef(null)
+  usePopup('picker', !!pickerOpen, () => setPickerOpen(false))
 
   useEffect(() => {
     getTeamMembers(teamId)

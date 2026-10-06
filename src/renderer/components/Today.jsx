@@ -10,6 +10,7 @@ import {
 } from '../lib/clickup.js'
 import { formatDurationShort, formatTime, formatDate, startOfDay, endOfDay, startOfWeek } from '../lib/time.js'
 import { CreateTaskForm } from './CreateTask.jsx'
+import { usePopup } from '../lib/popups.js'
 import { getGoals } from '../lib/goals.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './Today.css'
@@ -317,6 +318,7 @@ export default function Today({ teamId, currentEntry, refreshKey, onChange, onTa
 function EntryCard({ card, teamId, isRunning, highlighted, onHover, onChange, onTaskTracked, currentEntry, onDragCard, dragCard, color }) {
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState(null) // null | 'assign' | 'create'
+  usePopup(`card/${card.key}`, mode !== null, () => setMode(null))
   const [dropOver, setDropOver] = useState(false)
 
   const name = card.task?.name || card.description || 'Untitled'

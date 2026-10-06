@@ -10,6 +10,7 @@ import { formatDuration, formatDurationShort, formatTime, startOfDay, endOfDay }
 import { getGoals } from '../lib/goals.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { CreateTaskForm } from './CreateTask.jsx'
+import { usePopup } from '../lib/popups.js'
 import './TimerBar.css'
 
 // Compact always-visible timer strip: start/stop, elapsed, task switch,
@@ -38,6 +39,10 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   const setText = noteMode ? setNoteDraft : setQuery
   const [navigated, setNavigated] = useState(false) // arrow keys used, so Enter picks
   const [creating, setCreating] = useState(false) // the new-task form under the field
+
+  usePopup('bar/dropdown', open, () => { setOpen(false); inputRef.current?.blur() })
+  usePopup('bar/create', creating, () => setCreating(false))
+  usePopup('bar/since', editingStart, () => setEditingStart(false))
 
   const { tasks: taskItems, settled: searchSettled } = useTaskSuggestions(teamId, userId, text, {
     excludeId: runningTask?.id ?? null,

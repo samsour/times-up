@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createTimeEntry, updateTimeEntry, deleteTimeEntry, searchTasks, startTimer, stopTimer, getCurrentTimer, createTask } from '../lib/clickup.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { CreateTaskForm } from './CreateTask.jsx'
+import { usePopup } from '../lib/popups.js'
 import { formatDurationShort, formatTime, startOfDay } from '../lib/time.js'
 import './Timetable.css'
 
@@ -157,6 +158,11 @@ export default function Timetable({
   const [editTaskResults, setEditTaskResults] = useState(null)
   // Which popup has the new-task form open: 'edit' | 'draft' | null
   const [creatingIn, setCreatingIn] = useState(null)
+
+  // One popup at a time app-wide; the create form nests inside its popup
+  usePopup('timetable/edit', !!editing, () => setEditing(null))
+  usePopup('timetable/draft', !!draft, () => resetDraft())
+  usePopup(`timetable/${creatingIn}/create`, creatingIn !== null, () => setCreatingIn(null))
 
   async function createTaskIn(name, listId) {
     const task = await createTask(listId, name)
