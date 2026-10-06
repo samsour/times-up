@@ -4,7 +4,9 @@ import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { CreateTaskForm } from './CreateTask.jsx'
 import './TaskPicker.css'
 
-export default function TaskPicker({ teamId, userId, initialSearch = '', onPick, onCancel }) {
+// defaultName: what a new task is called when nothing was searched for,
+// typically the running entry's note
+export default function TaskPicker({ teamId, userId, initialSearch = '', defaultName = '', onPick, onCancel }) {
   const [crumbs, setCrumbs] = useState([{ type: 'team', name: 'Spaces' }])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
@@ -201,7 +203,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', onPick,
             <div className="picker-section">{group.label}</div>
             {group.label === 'Tasks' && (
               newName === null ? (
-                <button className="picker-item picker-item-create" onClick={() => setNewName('')}>
+                <button className="picker-item picker-item-create" onClick={() => setNewName(defaultName)}>
                   <span className="picker-icon picker-icon-create">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
                   </span>
@@ -261,7 +263,7 @@ export default function TaskPicker({ teamId, userId, initialSearch = '', onPick,
           <div className="picker-create-form">
             <CreateTaskForm
               teamId={teamId}
-              initialName={search.trim()}
+              initialName={search.trim() || defaultName}
               busy={busy}
               onCreate={createAndPick}
               onCancel={() => setCreating(false)}

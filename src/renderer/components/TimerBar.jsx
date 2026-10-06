@@ -306,7 +306,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                 <div className="timer-bar-dropdown timer-bar-create">
                   <CreateTaskForm
                     teamId={teamId}
-                    initialName={text.trim()}
+                    initialName={text.trim() || currentEntry?.description || ''}
                     busy={busy}
                     onCreate={(listId, name) => handleCreateTask(listId, name)}
                     onCancel={() => { setCreating(false); inputRef.current?.focus() }}

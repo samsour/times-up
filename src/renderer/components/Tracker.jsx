@@ -270,6 +270,7 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
               teamId={teamId}
               userId={userId}
               initialSearch={pickerOpen.query || ''}
+              defaultName={currentEntry && !currentEntry.task ? (currentEntry.description || '') : ''}
               onPick={handleBrowsePick}
               onCancel={() => setPickerOpen(false)}
             />
