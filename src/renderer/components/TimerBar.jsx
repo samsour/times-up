@@ -31,8 +31,14 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
 
   const isRunning = !!currentEntry
   const runningTask = currentEntry?.task || null
+  // Running without a task: one field is both the note and the task search.
+  // Text left in it is the description; a picked row assigns the task.
+  const noteMode = isRunning && !runningTask && !switching
+  const text = noteMode ? noteDraft : query
+  const setText = noteMode ? setNoteDraft : setQuery
+  const [navigated, setNavigated] = useState(false) // arrow keys used, so Enter picks
 
-  const { tasks: taskItems, settled: searchSettled } = useTaskSuggestions(teamId, userId, query, {
+  const { tasks: taskItems, settled: searchSettled } = useTaskSuggestions(teamId, userId, text, {
     excludeId: runningTask?.id ?? null,
     refreshKey: currentEntry?.id ?? null,
   })
@@ -137,7 +143,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   }
 
   async function handleCreateTask() {
-    const name = query.trim()
+    const name = text.trim()
     if (!name || !lastList) return
     setBusy(true)
     try {
@@ -160,7 +166,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   }
 
   async function saveNote() {
-    if (!isRunning || noteDraft === (currentEntry.description || '')) return
+    if (!isRunning || runningTask || noteDraft === (currentEntry.description || '')) return
     try {
       await updateTimeEntry(teamId, currentEntry.id, { description: noteDraft })
       onChange()
@@ -189,14 +195,14 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
     }
   }
 
-  const q = query.trim().toLowerCase()
+  const q = text.trim().toLowerCase()
   const showStartNote = !isRunning && q.length > 0
   const showCreate = q && searchSettled && taskItems.length === 0 && lastList
   // Row order mirrors the render: optional note row, tasks, optional create row
   const rowCount = (showStartNote ? 1 : 0) + taskItems.length + (showCreate ? 1 : 0)
 
   function rowAction(idx) {
-    if (showStartNote && idx === 0) return () => startUnassigned(query.trim())
+    if (showStartNote && idx === 0) return () => startUnassigned(text.trim())
     const taskIdx = idx - (showStartNote ? 1 : 0)
     if (taskIdx < taskItems.length) return () => pickTask(taskItems[taskIdx])
     if (showCreate) return handleCreateTask
@@ -206,20 +212,25 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   function handleKeys(e) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
+      setNavigated(true)
       setHighlight(h => Math.min(h + 1, rowCount - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
+      setNavigated(true)
       setHighlight(h => Math.max(h - 1, 0))
     } else if (e.key === 'Enter') {
+      // In note mode Enter keeps the text as the description unless a row
+      // was deliberately chosen with the arrow keys
+      if (noteMode && !navigated) { e.target.blur(); return }
       const action = rowAction(highlight)
       if (action) action()
-      else if (!isRunning) startUnassigned(query.trim())
+      else if (!isRunning) startUnassigned(text.trim())
     } else if (e.key === 'Escape') {
       e.target.blur()
     }
   }
 
-  const showSearchInput = !isRunning || switching
+  const showSearchInput = !isRunning || switching || noteMode
   const total = completedToday + (isRunning ? elapsed : 0)
   const pct = capacity > 0 ? Math.min(total / capacity, 1) : 0
 
@@ -260,14 +271,17 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
             <>
               <input
                 ref={inputRef}
-                className="timer-bar-input"
-                placeholder={isRunning ? (runningTask ? 'Switch task…' : 'Assign a task…') : pomoOn ? 'What will you focus on?' : 'Start a task or note…'}
-                value={query}
-                onChange={e => { setQuery(e.target.value); setHighlight(0) }}
-                onFocus={() => setOpen(true)}
-                onBlur={() => { setOpen(false); if (switching) setSwitching(false) }}
+                className={`timer-bar-input ${noteMode ? 'timer-bar-note' : ''}`}
+                placeholder={noteMode
+                  ? 'What are you working on? Pick a task or leave a note'
+                  : isRunning ? 'Switch task…' : pomoOn ? 'What will you focus on?' : 'Start a task or note…'}
+                value={text}
+                onChange={e => { setText(e.target.value); setHighlight(0); setNavigated(false) }}
+                onFocus={() => { setOpen(true); setNavigated(false) }}
+                onBlur={() => { setOpen(false); setNavigated(false); if (switching) setSwitching(false); if (noteMode) saveNote() }}
                 onKeyDown={handleKeys}
                 autoFocus={switching}
+                maxLength={noteMode ? 200 : undefined}
               />
               {open && (
                 <div className="timer-bar-dropdown">
@@ -276,10 +290,10 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                       className={`suggestion-row ${highlight === 0 ? 'suggestion-row-active' : ''}`}
                       onMouseDown={e => e.preventDefault()}
                       onMouseEnter={() => setHighlight(0)}
-                      onClick={() => startUnassigned(query.trim())}
+                      onClick={() => startUnassigned(text.trim())}
                       disabled={busy}
                     >
-                      <span className="suggestion-row-name">Start unassigned: “{query.trim()}”</span>
+                      <span className="suggestion-row-name">Start unassigned: “{text.trim()}”</span>
                     </button>
                   )}
                   {taskItems.map((task, i) => {
@@ -315,7 +329,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                       onClick={handleCreateTask}
                       disabled={busy}
                     >
-                      <span className="suggestion-row-name">+ Create “{query.trim()}” in {lastList.name}</span>
+                      <span className="suggestion-row-name">+ Create “{text.trim()}” in {lastList.name}</span>
                     </button>
                   )}
                   <button
@@ -335,27 +349,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                 <path d="M8 7l4-4 4 4M8 17l4 4 4-4" />
               </svg>
             </button>
-          ) : (
-            // Running without a task: note input plus a way to attach one
-            <div className="timer-bar-unassigned">
-              <input
-                className="timer-bar-input timer-bar-note"
-                placeholder="What are you working on?"
-                value={noteDraft}
-                onChange={e => setNoteDraft(e.target.value)}
-                onBlur={saveNote}
-                onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
-                maxLength={200}
-              />
-              <button
-                className="timer-bar-assign"
-                onClick={() => setSwitching(true)}
-                title="Assign this entry to a task"
-              >
-                + task
-              </button>
-            </div>
-          )}
+          ) : null}
         </div>
 
         {isRunning && !inFocus && (
