@@ -364,12 +364,14 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                       {showCreate ? 'Create in another list…' : `+ Create “${text.trim()}”…`}
                     </button>
                   )}
+                  {/* Carry the query over when it found something, so the
+                      same results get the roomier list; a miss starts clean */}
                   <button
                     className="suggestion-browse"
                     onMouseDown={e => e.preventDefault()}
-                    onClick={() => { setOpen(false); onBrowse() }}
+                    onClick={() => { setOpen(false); onBrowse(taskItems.length > 0 ? text.trim() : '') }}
                   >
-                    Browse all tasks →
+                    {taskItems.length > 0 && q ? 'Show all results →' : 'Browse all tasks →'}
                   </button>
                 </div>
               )}
