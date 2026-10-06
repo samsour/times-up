@@ -199,11 +199,15 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   const noMatch = q.length > 0 && searchSettled && taskItems.length === 0
   // Row order mirrors the render. With matches: optional "start unassigned",
   // then the tasks. With none: "create" first, then "start unassigned"
-  const rowCount = noMatch
+  // Browse is always the last row, so every row is reachable by keyboard
+  const rowCount = (noMatch
     ? 1 + (showStartNote ? 1 : 0)
-    : (showStartNote ? 1 : 0) + taskItems.length
+    : (showStartNote ? 1 : 0) + taskItems.length) + 1
+  const browseIdx = rowCount - 1
+  const browse = () => { setOpen(false); onBrowse(taskItems.length > 0 ? text.trim() : '') }
 
   function rowAction(idx) {
+    if (idx === browseIdx) return browse
     if (noMatch) {
       if (idx === 0) return () => { setOpen(false); setCreating(true) }
       if (showStartNote && idx === 1) return () => startUnassigned(text.trim())
@@ -214,6 +218,10 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
     if (taskIdx < taskItems.length) return () => pickTask(taskItems[taskIdx])
     return null
   }
+
+  const PlusIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M12 5v14M5 12h14" /></svg>
+  const PlayIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+  const GridIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
 
   function handleKeys(e) {
     if (e.key === 'ArrowDown') {
@@ -323,23 +331,25 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                     <>
                       <div className="suggestion-note">No task called “{text.trim()}”.</div>
                       <button
-                        className={`suggestion-row suggestion-row-create ${highlight === 0 ? 'suggestion-row-active' : ''}`}
+                        className={`suggestion-row suggestion-row-action ${highlight === 0 ? 'suggestion-row-active' : ''}`}
                         onMouseDown={e => e.preventDefault()}
                         onMouseEnter={() => setHighlight(0)}
                         onClick={() => { setOpen(false); setCreating(true) }}
                         disabled={busy}
                       >
-                        <span className="suggestion-row-name">+ Create task “{text.trim()}”</span>
+                        <span className="suggestion-row-icon"><PlusIcon /></span>
+                        <span className="suggestion-row-name">Create task “{text.trim()}”</span>
                       </button>
                       {showStartNote && (
                         <button
-                          className={`suggestion-row ${highlight === 1 ? 'suggestion-row-active' : ''}`}
+                          className={`suggestion-row suggestion-row-action ${highlight === 1 ? 'suggestion-row-active' : ''}`}
                           onMouseDown={e => e.preventDefault()}
                           onMouseEnter={() => setHighlight(1)}
                           onClick={() => startUnassigned(text.trim())}
                           disabled={busy}
                         >
-                          <span className="suggestion-row-name">Start unassigned: “{text.trim()}”</span>
+                          <span className="suggestion-row-icon"><PlayIcon /></span>
+                          <span className="suggestion-row-name">Start unassigned “{text.trim()}”</span>
                         </button>
                       )}
                     </>
@@ -347,13 +357,14 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                     <>
                       {showStartNote && (
                         <button
-                          className={`suggestion-row ${highlight === 0 ? 'suggestion-row-active' : ''}`}
+                          className={`suggestion-row suggestion-row-action ${highlight === 0 ? 'suggestion-row-active' : ''}`}
                           onMouseDown={e => e.preventDefault()}
                           onMouseEnter={() => setHighlight(0)}
                           onClick={() => startUnassigned(text.trim())}
                           disabled={busy}
                         >
-                          <span className="suggestion-row-name">Start unassigned: “{text.trim()}”</span>
+                          <span className="suggestion-row-icon"><PlayIcon /></span>
+                          <span className="suggestion-row-name">Start unassigned “{text.trim()}”</span>
                         </button>
                       )}
                       {taskItems.map((task, i) => {
@@ -386,11 +397,14 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                   {/* Carry the query over when it found something, so the
                       same results get the roomier list; a miss starts clean */}
                   <button
-                    className="suggestion-browse"
+                    className={`suggestion-row suggestion-row-action ${highlight === browseIdx ? 'suggestion-row-active' : ''}`}
                     onMouseDown={e => e.preventDefault()}
-                    onClick={() => { setOpen(false); onBrowse(taskItems.length > 0 ? text.trim() : '') }}
+                    onMouseEnter={() => setHighlight(browseIdx)}
+                    onClick={browse}
                   >
-                    {taskItems.length > 0 && q ? 'Show all results →' : 'Browse all tasks →'}
+                    <span className="suggestion-row-icon"><GridIcon /></span>
+                    <span className="suggestion-row-name">{taskItems.length > 0 && q ? 'Show all results' : 'Browse all tasks'}</span>
+                    <span className="suggestion-row-arrow">→</span>
                   </button>
                 </div>
               )}
