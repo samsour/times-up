@@ -351,7 +351,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
                         >
                           <span className="suggestion-row-name">{task.name}</span>
                           <span className="suggestion-row-meta">
-                            <span className="suggestion-row-list">{task.list || '—'}</span>
+                            <span className="suggestion-row-list">{task.list || ''}</span>
                             {task.status && (
                               <span className="suggestion-row-status">
                                 <span className="suggestion-row-dot" style={{ background: task.statusColor || 'var(--text-muted)' }} />

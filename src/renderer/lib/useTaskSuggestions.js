@@ -35,7 +35,10 @@ export function useTaskSuggestions(teamId, userId, query, { limit = 8, excludeId
         for (const e of sorted) {
           if (e.task?.id && !seen.has(e.task.id)) {
             seen.add(e.task.id)
-            tasks.push(normalizeTask(e.task, true))
+            // The task inside a time entry has no list; the entry's
+            // task_location carries it
+            const list = e.task.list || (e.task_location?.list_name ? { id: e.task_location.list_id, name: e.task_location.list_name } : undefined)
+            tasks.push(normalizeTask({ ...e.task, list }, true))
           }
         }
         setRecents(tasks)
