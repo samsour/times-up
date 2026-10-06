@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { getSpaces, getFolders, getFolderlessLists, getListsInFolder, getTasks } from '../lib/clickup.js'
+import { getSpaces, getFolders, getFolderlessLists, getListsInFolder, getTasks, createTask } from '../lib/clickup.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
+import { CreateTaskForm } from './Today.jsx'
 import './TaskPicker.css'
 
 export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
@@ -9,6 +10,29 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
+  const [newName, setNewName] = useState(null) // inline "new task" row inside a list, null = closed
+  const [creating, setCreating] = useState(false) // list picker form, from a search with no match
+  const [busy, setBusy] = useState(false)
+  const [lastList, setLastList] = useState(null)
+
+  useEffect(() => {
+    window.api.store.get('last_list').then(l => l && setLastList(l))
+  }, [])
+
+  // Create, then hand the new task over as if it had been picked
+  async function createAndPick(listId, name) {
+    const n = name.trim()
+    if (!n) return
+    setBusy(true)
+    try {
+      const task = await createTask(listId, n)
+      onPick({ id: task.id, name: task.name })
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const { tasks: searchResults, settled } = useTaskSuggestions(teamId, userId, search, { limit: 12 })
   // With no query the hook yields recent and assigned tasks: a shortcut
@@ -26,6 +50,7 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
     setLoading(true)
     setError('')
     setSearch('')
+    setNewName(null)
     try {
       let result = []
       if (current.type === 'team') {
@@ -150,6 +175,37 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
         {!isSearching && !loading && !error && groupItems(items, current.type).map(group => (
           <div key={group.label}>
             <div className="picker-section">{group.label}</div>
+            {group.label === 'Tasks' && (
+              newName === null ? (
+                <button className="picker-item picker-item-create" onClick={() => setNewName('')}>
+                  <span className="picker-icon picker-icon-create">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
+                  </span>
+                  <span className="picker-item-name">New task in {current.name}</span>
+                </button>
+              ) : (
+                <div className="picker-item picker-item-new">
+                  <span className="picker-icon picker-icon-create">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
+                  </span>
+                  <input
+                    className="picker-new-input"
+                    placeholder="Task name"
+                    value={newName}
+                    autoFocus
+                    disabled={busy}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') createAndPick(current.id, newName)
+                      if (e.key === 'Escape') setNewName(null)
+                    }}
+                  />
+                  <button className="picker-new-go" onClick={() => createAndPick(current.id, newName)} disabled={busy || !newName.trim()}>
+                    {busy ? '…' : 'Create'}
+                  </button>
+                </div>
+              )
+            )}
             {group.items.map(item => (
               <button key={`${item.kind}-${item.id}`} className="picker-item" onClick={() => drill(item)}>
                 <span
@@ -177,10 +233,18 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
             {[0, 1, 2].map(i => <div key={i} className="picker-skeleton-row" style={{ opacity: 1 - i * 0.25 }} />)}
           </div>
         )}
-        {isSearching && settled && searchResults.length === 0 && (
-          <div className="picker-empty">No tasks found.</div>
+        {isSearching && creating && (
+          <div className="picker-create-form">
+            <CreateTaskForm
+              teamId={teamId}
+              initialName={search.trim()}
+              busy={busy}
+              onCreate={createAndPick}
+              onCancel={() => setCreating(false)}
+            />
+          </div>
         )}
-        {isSearching && searchResults.map(task => (
+        {isSearching && !creating && searchResults.map(task => (
           <button
             key={task.id}
             className="picker-item"
@@ -194,6 +258,28 @@ export default function TaskPicker({ teamId, userId, onPick, onCancel }) {
             {task.status && <StatusPill status={task.status} color={task.statusColor} />}
           </button>
         ))}
+        {isSearching && !creating && settled && (
+          <>
+            {searchResults.length === 0 && <div className="picker-empty">No task called “{search.trim()}”.</div>}
+            {lastList && (
+              <button className="picker-item picker-item-create" onClick={() => createAndPick(lastList.id, search)} disabled={busy}>
+                <span className="picker-icon picker-icon-create">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
+                </span>
+                <span className="picker-item-info">
+                  <span className="picker-item-name">Create “{search.trim()}”</span>
+                  <span className="picker-item-context">in {lastList.name}</span>
+                </span>
+              </button>
+            )}
+            <button className="picker-item picker-item-create" onClick={() => setCreating(true)} disabled={busy}>
+              <span className="picker-icon picker-icon-create">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
+              </span>
+              <span className="picker-item-name">{lastList ? 'Create in another list…' : `Create “${search.trim()}”…`}</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

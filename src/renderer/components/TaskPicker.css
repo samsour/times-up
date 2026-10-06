@@ -284,3 +284,56 @@
   opacity: 0.7;
   transition: all 0.12s;
 }
+
+/* Creating a task */
+
+.picker-icon-create {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.picker-item-create .picker-item-name {
+  color: var(--accent);
+}
+
+.picker-item-new {
+  cursor: default;
+}
+
+.picker-item-new:hover {
+  background: transparent;
+}
+
+.picker-new-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 999px;
+}
+
+.picker-new-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.picker-new-go {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--cta-text);
+  background: var(--cta-bg);
+}
+
+.picker-new-go:disabled {
+  opacity: 0.5;
+}
+
+.picker-create-form {
+  padding: 4px 10px;
+}
