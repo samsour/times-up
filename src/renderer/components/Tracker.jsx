@@ -8,7 +8,7 @@ import Settings from './Settings.jsx'
 import IdlePrompt from './IdlePrompt.jsx'
 import Planning from './Planning.jsx'
 import Focus from './Focus.jsx'
-import { getCurrentTimer, startTimer, updateTimeEntry, advanceTaskStatus, updateTask, getTeamMembers, canViewOthersTime } from '../lib/clickup.js'
+import { getCurrentTimer, startTimer, updateTimeEntry, advanceTaskStatus, updateTask, getTeamMembers, canViewOthersTime, getTask } from '../lib/clickup.js'
 import './Tracker.css'
 
 // Which surface this renderer runs in: the menu bar popover (hides on blur,
@@ -140,6 +140,11 @@ export default function Tracker({ teamId, userId, theme, onThemeChange, font, on
   // board reflects reality for the whole team. Toggleable in Settings.
   const handleTaskTracked = useCallback(async (taskId) => {
     if (!taskId) return
+    // Remember the task's list: "+ Create" offers it as the default home
+    // for new tasks in the timer bar, Focus and the timetable popups
+    getTask(taskId)
+      .then(t => { if (t?.list?.id) window.api.store.set('last_list', { id: t.list.id, name: t.list.name }) })
+      .catch(() => {})
     try {
       const enabled = await window.api.store.get('auto_progress')
       if (enabled === false) return

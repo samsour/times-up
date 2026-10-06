@@ -67,6 +67,7 @@ export default function TimerBar({ teamId, userId, currentEntry, pomo, onBrowse,
   useEffect(() => {
     getGoals().then(g => setCapacity(g.dailyMs))
     window.api.store.get('last_list').then(l => l && setLastList(l))
+    return window.api.store.onChange(({ key, value }) => { if (key === 'last_list' && value) setLastList(value) })
   }, [])
 
   useEffect(() => {

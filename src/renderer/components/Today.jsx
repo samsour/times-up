@@ -568,7 +568,7 @@ function AssignForm({ teamId, excludeId = null, onPick, onCancel, busy }) {
   )
 }
 
-function CreateTaskForm({ teamId, initialName, onCreate, onCancel, busy }) {
+export function CreateTaskForm({ teamId, initialName, onCreate, onCancel, busy }) {
   const [name, setName] = useState(initialName || '')
   const [recents, setRecents] = useState([])
   const [picked, setPicked] = useState(null)

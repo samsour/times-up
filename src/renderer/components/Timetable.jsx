@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { createTimeEntry, updateTimeEntry, deleteTimeEntry, searchTasks, startTimer, stopTimer, getCurrentTimer } from '../lib/clickup.js'
+import { createTimeEntry, updateTimeEntry, deleteTimeEntry, searchTasks, startTimer, stopTimer, getCurrentTimer, createTask } from '../lib/clickup.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import { formatDurationShort, formatTime, startOfDay } from '../lib/time.js'
 import './Timetable.css'
@@ -154,6 +154,18 @@ export default function Timetable({
   const [editTaskText, setEditTaskText] = useState('')
   const [editTaskPicked, setEditTaskPicked] = useState(null)
   const [editTaskResults, setEditTaskResults] = useState(null)
+  // Where "+ Create" puts new tasks: the list last tracked against
+  const [lastList, setLastList] = useState(null)
+  useEffect(() => {
+    window.api.store.get('last_list').then(l => l && setLastList(l))
+    return window.api.store.onChange(({ key, value }) => { if (key === 'last_list' && value) setLastList(value) })
+  }, [])
+
+  async function createTaskIn(name) {
+    const task = await createTask(lastList.id, name)
+    onTaskTracked?.(task.id)
+    return { id: task.id, name: task.name }
+  }
   // Measured height of the edit popup, so it can be placed beside its block
   const editRef = useRef(null)
   const [editH, setEditH] = useState(0)
@@ -198,7 +210,7 @@ export default function Timetable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, firstDay, days.length])
 
-  const { tasks: draftSuggestions } = useTaskSuggestions(teamId, undefined, draftTaskQuery, { limit: 5 })
+  const { tasks: draftSuggestions, settled: draftSettled } = useTaskSuggestions(teamId, undefined, draftTaskQuery, { limit: 5 })
 
   function resetDraft() {
     setDraft(null)
@@ -926,7 +938,7 @@ export default function Timetable({
                   onKeyDown={e => { if (e.key === 'Escape') cancelDraft() }}
                 />
               )}
-              {!draftTask && draftTaskFocus && draftSuggestions.length > 0 && (
+              {!draftTask && draftTaskFocus && (draftSuggestions.length > 0 || (draftTaskQuery.trim() && draftSettled && lastList)) && (
                 <div className="edit-task-results">
                   {draftSuggestions.map(t => (
                     <button
@@ -939,6 +951,22 @@ export default function Timetable({
                       {t.list && <span className="edit-task-result-meta">{t.list}</span>}
                     </button>
                   ))}
+                  {draftTaskQuery.trim() && draftSettled && draftSuggestions.length === 0 && lastList && (
+                    <button
+                      className="edit-task-result edit-task-create"
+                      onMouseDown={e => e.preventDefault()}
+                      disabled={saving}
+                      onClick={async () => {
+                        setSaving(true)
+                        try {
+                          setDraftTask(await createTaskIn(draftTaskQuery.trim()))
+                          setDraftTaskQuery('')
+                        } catch (err) { alert(err.message) } finally { setSaving(false) }
+                      }}
+                    >
+                      <span className="edit-task-result-name">+ Create “{draftTaskQuery.trim()}” in {lastList.name}</span>
+                    </button>
+                  )}
                 </div>
               )}
               <div className="draft-actions">
@@ -1101,7 +1129,25 @@ export default function Timetable({
                 {editTaskResults && (
                   <div className="edit-task-results">
                     {editTaskResults.length === 0 && (
-                      <div className="edit-task-empty">No tasks found.</div>
+                      lastList ? (
+                        <button
+                          className="edit-task-result edit-task-create"
+                          disabled={saving}
+                          onClick={async () => {
+                            setSaving(true)
+                            try {
+                              const t = await createTaskIn(editTaskText.trim())
+                              setEditTaskPicked(t)
+                              setEditTaskText(t.name)
+                              setEditTaskResults(null)
+                            } catch (err) { alert(err.message) } finally { setSaving(false) }
+                          }}
+                        >
+                          <span className="edit-task-result-name">+ Create “{editTaskText.trim()}” in {lastList.name}</span>
+                        </button>
+                      ) : (
+                        <div className="edit-task-empty">No tasks found.</div>
+                      )
                     )}
                     {editTaskResults.slice(0, 6).map(t => (
                       <button

@@ -263,6 +263,10 @@
   text-overflow: ellipsis;
 }
 
+.focus-recent-create .focus-recent-name {
+  color: var(--accent);
+}
+
 .focus-recent-list {
   flex-shrink: 0;
   font-size: 11px;

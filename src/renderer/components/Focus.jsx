@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { startTimer, stopTimer, getTimeEntries } from '../lib/clickup.js'
+import { startTimer, stopTimer, getTimeEntries, createTask } from '../lib/clickup.js'
+import { CreateTaskForm } from './Today.jsx'
 import { formatDuration, formatDurationShort, formatTime, startOfDay, endOfDay } from '../lib/time.js'
 import { useTaskSuggestions } from '../lib/useTaskSuggestions.js'
 import './Focus.css'
@@ -12,6 +13,13 @@ export default function Focus({ teamId, userId, currentEntry, pomo, refreshKey, 
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [todayEntries, setTodayEntries] = useState([])
+  const [lastList, setLastList] = useState(null)
+  const [creating, setCreating] = useState(false) // full create form with a list picker
+
+  useEffect(() => {
+    window.api.store.get('last_list').then(l => l && setLastList(l))
+    return window.api.store.onChange(({ key, value }) => { if (key === 'last_list' && value) setLastList(value) })
+  }, [])
 
   const isRunning = !!currentEntry
   const phase = pomo?.phase || null
@@ -19,7 +27,7 @@ export default function Focus({ teamId, userId, currentEntry, pomo, refreshKey, 
   const inBreak = phase === 'short' || phase === 'long'
   const phaseKey = inFocus ? 'focus' : inBreak ? phase : 'ready'
 
-  const { tasks } = useTaskSuggestions(teamId, userId, query, {
+  const { tasks, settled } = useTaskSuggestions(teamId, userId, query, {
     limit: 6,
     excludeId: currentEntry?.task?.id ?? null,
     refreshKey,
@@ -59,6 +67,23 @@ export default function Focus({ teamId, userId, currentEntry, pomo, refreshKey, 
       setQuery('')
       onChange?.()
       if (task?.id) onTaskTracked?.(task.id)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // New task in a list, then straight into a block on it
+  async function createAndStart(listId, name) {
+    setBusy(true)
+    try {
+      const task = await createTask(listId, name)
+      await startTimer(teamId, task.id, '')
+      setQuery('')
+      setCreating(false)
+      onChange?.()
+      onTaskTracked?.(task.id)
     } catch (err) {
       alert(err.message)
     } finally {
@@ -181,7 +206,15 @@ export default function Focus({ teamId, userId, currentEntry, pomo, refreshKey, 
               Start
             </button>
           </div>
-          {tasks.length > 0 && (
+          {creating ? (
+            <CreateTaskForm
+              teamId={teamId}
+              initialName={query.trim()}
+              busy={busy}
+              onCreate={createAndStart}
+              onCancel={() => setCreating(false)}
+            />
+          ) : (
             <div className="focus-recent">
               {tasks.map(t => (
                 <button key={t.id} className="focus-recent-row" onClick={() => start(t)} disabled={busy}>
@@ -189,6 +222,18 @@ export default function Focus({ teamId, userId, currentEntry, pomo, refreshKey, 
                   {t.list && <span className="focus-recent-list">{t.list}</span>}
                 </button>
               ))}
+              {query.trim() && settled && tasks.length === 0 && (
+                <>
+                  {lastList && (
+                    <button className="focus-recent-row focus-recent-create" onClick={() => createAndStart(lastList.id, query.trim())} disabled={busy}>
+                      <span className="focus-recent-name">+ Create “{query.trim()}” in {lastList.name}</span>
+                    </button>
+                  )}
+                  <button className="focus-recent-row focus-recent-create" onClick={() => setCreating(true)} disabled={busy}>
+                    <span className="focus-recent-name">{lastList ? 'Create in another list…' : `+ Create “${query.trim()}” as a task…`}</span>
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
