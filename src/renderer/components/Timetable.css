@@ -701,11 +701,24 @@
   );
 }
 
-/* Draft popup: the suggestion rows sit inline, same look as the timer bar's */
+/* Draft popup: the suggestion rows sit inline, same look as the timer bar's.
+   The container stays on the popup's own surface so the row highlight,
+   which uses the hover colour, actually shows */
 .draft-rows {
-  padding: 4px;
+  padding: 0;
+  background: transparent;
+  max-height: 180px;
 }
 
 .draft-rows .suggestion-row {
   padding: 6px 8px;
+}
+
+.draft-rows .suggestion-note {
+  padding: 6px 8px;
+}
+
+/* The draft's time row has no day pickers: a single line */
+.draft-times {
+  grid-template-columns: 1fr auto 1fr auto;
 }

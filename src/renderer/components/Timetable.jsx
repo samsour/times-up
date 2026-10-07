@@ -929,10 +929,55 @@ export default function Timetable({
               className="timetable-draft-form"
               style={{ top: offToY(draft.start - draft.day), ...popupBox(draft.day, 240) }}
             >
-              <div className="draft-time">
-                {formatTime(draft.start)} – {formatTime(draft.end)}
-                <span className="draft-dur">{formatDurationShort(draft.end - draft.start)}</span>
-              </div>
+              {(() => {
+                // Start and end are editable here too, for a drag that missed
+                const d = draft.day
+                const setStart = t => {
+                  const duration = draft.end - draft.start
+                  const start = Math.max(d, Math.min(t, d + DAY_MS - snapMs))
+                  setDraft({ ...draft, start, end: Math.min(start + duration, d + DAY_MS) })
+                }
+                const setEnd = t => setDraft({ ...draft, end: Math.min(Math.max(t, draft.start + snapMs), d + DAY_MS) })
+                const startOpts = []
+                const endOpts = []
+                if (snapOn) {
+                  for (let t = d; t <= d + DAY_MS - snapMs; t += snapMs) startOpts.push(t)
+                  if (!startOpts.includes(draft.start)) startOpts.push(draft.start), startOpts.sort((a, b) => a - b)
+                  const first = Math.ceil((draft.start + 1) / snapMs) * snapMs
+                  for (let t = first; t <= d + DAY_MS; t += snapMs) endOpts.push(t)
+                  if (!endOpts.includes(draft.end)) endOpts.push(draft.end), endOpts.sort((a, b) => a - b)
+                }
+                return (
+                  <div className="edit-times draft-times">
+                    {snapOn ? (
+                      <select className="draft-input edit-select" value={draft.start} onChange={e => setStart(Number(e.target.value))}>
+                        {startOpts.map(t => <option key={t} value={t}>{formatTime(t)}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        className="draft-input edit-select edit-time"
+                        type="time"
+                        value={toHM(draft.start)}
+                        onChange={e => { const t = fromHM(d, e.target.value); if (t !== null) setStart(t) }}
+                      />
+                    )}
+                    <span className="edit-times-sep">–</span>
+                    {snapOn ? (
+                      <select className="draft-input edit-select" value={draft.end} onChange={e => setEnd(Number(e.target.value))}>
+                        {endOpts.map(t => <option key={t} value={t}>{formatTime(t)}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        className="draft-input edit-select edit-time"
+                        type="time"
+                        value={toHM(draft.end)}
+                        onChange={e => { const t = fromHM(d, e.target.value); if (t !== null) setEnd(t) }}
+                      />
+                    )}
+                    <span className="draft-dur">{formatDurationShort(draft.end - draft.start)}</span>
+                  </div>
+                )
+              })()}
               {draftTask ? (
                 <button className="draft-task-chip" title="Remove task" onClick={() => setDraftTask(null)}>
                   <span className="draft-task-chip-name">{draftTask.name}</span>
@@ -946,7 +991,8 @@ export default function Timetable({
                   ? [{ key: 'create', run: () => setCreatingIn('draft') }]
                   : draftSuggestions.map(t => ({ key: t.id, run: () => { setDraftTask({ id: t.id, name: t.name }); setDraftDesc('') } }))
                 if (q) rows.push({ key: 'note', run: saveDraft })
-                const showRows = draftTaskFocus && creatingIn !== 'draft' && rows.length > 0
+                // Nothing until something is typed: an empty popup shouldn't open with a list
+                const showRows = draftTaskFocus && creatingIn !== 'draft' && q.length > 0 && rows.length > 0
                 const PlusIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M12 5v14M5 12h14" /></svg>
                 const NoteIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
                 const idxOf = key => rows.findIndex(r => r.key === key)
