@@ -151,6 +151,9 @@ export default function Timetable({
   const [draftTaskFocus, setDraftTaskFocus] = useState(false)
   const [draftHighlight, setDraftHighlight] = useState(0)
   const [draftNavigated, setDraftNavigated] = useState(false)
+  // The field is focused when the popup opens; recent tasks only appear
+  // once the user clicks into it or types
+  const [draftClicked, setDraftClicked] = useState(false)
   const [saving, setSaving] = useState(false)
   const [draggingBlock, setDraggingBlock] = useState(null)
   const [editing, setEditing] = useState(null) // { entry, running, day }
@@ -234,6 +237,7 @@ export default function Timetable({
 
   function resetDraft() {
     setCreatingIn(null)
+    setDraftClicked(false)
     setDraft(null)
     setDraftDesc('')
     setDraftTask(null)
@@ -991,8 +995,8 @@ export default function Timetable({
                   ? [{ key: 'create', run: () => setCreatingIn('draft') }]
                   : draftSuggestions.map(t => ({ key: t.id, run: () => { setDraftTask({ id: t.id, name: t.name }); setDraftDesc('') } }))
                 if (q) rows.push({ key: 'note', run: saveDraft })
-                // Nothing until something is typed: an empty popup shouldn't open with a list
-                const showRows = draftTaskFocus && creatingIn !== 'draft' && q.length > 0 && rows.length > 0
+                // Not on open: the list waits for a click into the field or typing
+                const showRows = draftTaskFocus && creatingIn !== 'draft' && (q.length > 0 || draftClicked) && rows.length > 0
                 const PlusIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M12 5v14M5 12h14" /></svg>
                 const NoteIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
                 const idxOf = key => rows.findIndex(r => r.key === key)
@@ -1006,6 +1010,7 @@ export default function Timetable({
                       value={draftDesc}
                       onChange={e => { setDraftDesc(e.target.value); setDraftHighlight(0); setDraftNavigated(false) }}
                       onFocus={() => { setDraftTaskFocus(true); setDraftNavigated(false) }}
+                      onMouseDown={() => setDraftClicked(true)}
                       onBlur={() => setDraftTaskFocus(false)}
                       onKeyDown={e => {
                         if (e.key === 'ArrowDown') { e.preventDefault(); setDraftNavigated(true); setDraftHighlight(h => Math.min(h + 1, rows.length - 1)) }
