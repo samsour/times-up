@@ -82,17 +82,17 @@ export default function Timetable({
 
   const [now, setNow] = useState(Date.now())
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
-  // Snapping is opt-in: by default drags and the editor work to the minute,
-  // with the zoom level's grid used only when the user turns snapping on
-  const [snapOn, setSnapOn] = useState(false)
+  // Snapping to the zoom level's grid is the default; turning it off in
+  // Settings makes drags and the editor work to the minute
+  const [snapOn, setSnapOn] = useState(true)
   const { px: pxPerHour, snap: gridMs } = ZOOM_LEVELS[zoom]
   const snapMs = snapOn ? gridMs : MINUTE_MS
   const snapT = ms => snap(ms, snapMs)
 
   useEffect(() => {
-    window.api.store.get(SNAP_KEY).then(v => setSnapOn(!!v))
+    window.api.store.get(SNAP_KEY).then(v => setSnapOn(v !== false))
     return window.api.store.onChange(({ key, value }) => {
-      if (key === SNAP_KEY) setSnapOn(!!value)
+      if (key === SNAP_KEY) setSnapOn(value !== false)
     })
   }, [])
 
