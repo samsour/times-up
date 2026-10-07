@@ -146,8 +146,11 @@ export default function Timetable({
   const [draft, setDraft] = useState(null) // { day, start, end }
   const [draftDesc, setDraftDesc] = useState('')
   const [draftTask, setDraftTask] = useState(null) // picked { id, name }
-  const [draftTaskQuery, setDraftTaskQuery] = useState('')
+  // Like the timer bar: one field. Typing searches tasks; a picked row links
+  // the task, text left in the field is the note
   const [draftTaskFocus, setDraftTaskFocus] = useState(false)
+  const [draftHighlight, setDraftHighlight] = useState(0)
+  const [draftNavigated, setDraftNavigated] = useState(false)
   const [saving, setSaving] = useState(false)
   const [draggingBlock, setDraggingBlock] = useState(null)
   const [editing, setEditing] = useState(null) // { entry, running, day }
@@ -178,7 +181,7 @@ export default function Timetable({
     setSaving(true)
     try {
       const t = await createTaskIn(name, listId)
-      if (creatingIn === 'draft') { setDraftTask(t); setDraftTaskQuery('') }
+      if (creatingIn === 'draft') { setDraftTask(t); setDraftDesc('') }
       else { setEditTaskPicked(t); setEditTaskText(t.name); setEditTaskResults(null) }
       setCreatingIn(null)
     } catch (err) { alert(err.message) } finally { setSaving(false) }
@@ -227,14 +230,13 @@ export default function Timetable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, firstDay, days.length])
 
-  const { tasks: draftSuggestions, settled: draftSettled } = useTaskSuggestions(teamId, undefined, draftTaskQuery, { limit: 5 })
+  const { tasks: draftSuggestions, settled: draftSettled } = useTaskSuggestions(teamId, undefined, draftTask ? '' : draftDesc, { limit: 5 })
 
   function resetDraft() {
     setCreatingIn(null)
     setDraft(null)
     setDraftDesc('')
     setDraftTask(null)
-    setDraftTaskQuery('')
   }
 
   // Escape closes the open popup even when focus is elsewhere
@@ -455,7 +457,6 @@ export default function Timetable({
         setDraft({ day: dragDay, start, end })
         setDraftDesc('')
         setDraftTask(null)
-        setDraftTaskQuery('')
       }
     }
     document.addEventListener('mousemove', onMove)
@@ -559,7 +560,7 @@ export default function Timetable({
         taskId: draftTask?.id,
         start: draft.start,
         duration: draft.end - draft.start,
-        description: draftDesc.trim(),
+        description: draftTask ? '' : draftDesc.trim(),
       })
       resetDraft()
       await onChange?.()
@@ -932,64 +933,102 @@ export default function Timetable({
                 {formatTime(draft.start)} – {formatTime(draft.end)}
                 <span className="draft-dur">{formatDurationShort(draft.end - draft.start)}</span>
               </div>
-              <input
-                className="draft-input"
-                autoFocus
-                placeholder="What did you work on?"
-                value={draftDesc}
-                onChange={e => setDraftDesc(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') saveDraft()
-                  if (e.key === 'Escape') cancelDraft()
-                }}
-              />
               {draftTask ? (
                 <button className="draft-task-chip" title="Remove task" onClick={() => setDraftTask(null)}>
                   <span className="draft-task-chip-name">{draftTask.name}</span>
                   <span className="draft-task-chip-x">×</span>
                 </button>
-              ) : (
-                <input
-                  className="draft-input"
-                  placeholder="Link a task (optional)…"
-                  value={draftTaskQuery}
-                  onChange={e => setDraftTaskQuery(e.target.value)}
-                  onFocus={() => setDraftTaskFocus(true)}
-                  onBlur={() => setDraftTaskFocus(false)}
-                  onKeyDown={e => { if (e.key === 'Escape') cancelDraft() }}
-                />
-              )}
-              {!draftTask && draftTaskFocus && creatingIn !== 'draft' && (draftSuggestions.length > 0 || (draftTaskQuery.trim() && draftSettled)) && (
-                <div className="edit-task-results">
-                  {draftSuggestions.map(t => (
-                    <button
-                      key={t.id}
-                      className="edit-task-result"
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setDraftTask({ id: t.id, name: t.name }); setDraftTaskQuery('') }}
-                    >
-                      <span className="edit-task-result-name">{t.name}</span>
-                      {t.list && <span className="edit-task-result-meta">{t.list}</span>}
-                    </button>
-                  ))}
-                  {draftTaskQuery.trim() && draftSettled && draftSuggestions.length === 0 && (
-                    <>
-                      <div className="edit-task-empty">No task called “{draftTaskQuery.trim()}”.</div>
-                      <button
-                        className="edit-task-result edit-task-create"
-                        onMouseDown={e => e.preventDefault()}
-                        onClick={() => setCreatingIn('draft')}
-                      >
-                        <span className="edit-task-result-name">+ Create task “{draftTaskQuery.trim()}”</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
+              ) : (() => {
+                const q = draftDesc.trim()
+                const noMatch = q.length > 0 && draftSettled && draftSuggestions.length === 0
+                // Rows in order: matches (or create), then "save as note", like the timer bar
+                const rows = noMatch
+                  ? [{ key: 'create', run: () => setCreatingIn('draft') }]
+                  : draftSuggestions.map(t => ({ key: t.id, run: () => { setDraftTask({ id: t.id, name: t.name }); setDraftDesc('') } }))
+                if (q) rows.push({ key: 'note', run: saveDraft })
+                const showRows = draftTaskFocus && creatingIn !== 'draft' && rows.length > 0
+                const PlusIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M12 5v14M5 12h14" /></svg>
+                const NoteIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
+                const idxOf = key => rows.findIndex(r => r.key === key)
+                const rowCls = key => `suggestion-row ${idxOf(key) === draftHighlight ? 'suggestion-row-active' : ''}`
+                return (
+                  <>
+                    <input
+                      className="draft-input"
+                      autoFocus
+                      placeholder="Task or note…"
+                      value={draftDesc}
+                      onChange={e => { setDraftDesc(e.target.value); setDraftHighlight(0); setDraftNavigated(false) }}
+                      onFocus={() => { setDraftTaskFocus(true); setDraftNavigated(false) }}
+                      onBlur={() => setDraftTaskFocus(false)}
+                      onKeyDown={e => {
+                        if (e.key === 'ArrowDown') { e.preventDefault(); setDraftNavigated(true); setDraftHighlight(h => Math.min(h + 1, rows.length - 1)) }
+                        else if (e.key === 'ArrowUp') { e.preventDefault(); setDraftNavigated(true); setDraftHighlight(h => Math.max(h - 1, 0)) }
+                        else if (e.key === 'Enter') {
+                          // Enter keeps the text as the note unless a row was chosen with the arrows
+                          if (draftNavigated && rows[draftHighlight]) rows[draftHighlight].run()
+                          else saveDraft()
+                        }
+                        else if (e.key === 'Escape') cancelDraft()
+                      }}
+                    />
+                    {showRows && (
+                      <div className="edit-task-results draft-rows">
+                        {noMatch && <div className="suggestion-note">No task called “{q}”.</div>}
+                        {noMatch ? (
+                          <button
+                            className={`${rowCls('create')} suggestion-row-action`}
+                            onMouseDown={e => e.preventDefault()}
+                            onMouseEnter={() => setDraftHighlight(idxOf('create'))}
+                            onClick={() => setCreatingIn('draft')}
+                          >
+                            <span className="suggestion-row-icon"><PlusIcon /></span>
+                            <span className="suggestion-row-name">Create task “{q}”</span>
+                          </button>
+                        ) : draftSuggestions.map(t => (
+                          <button
+                            key={t.id}
+                            className={rowCls(t.id)}
+                            onMouseDown={e => e.preventDefault()}
+                            onMouseEnter={() => setDraftHighlight(idxOf(t.id))}
+                            onClick={() => { setDraftTask({ id: t.id, name: t.name }); setDraftDesc('') }}
+                          >
+                            <span className="suggestion-row-name">{t.name}</span>
+                            <span className="suggestion-row-meta">
+                              <span className="suggestion-row-list">{t.list || ''}</span>
+                              {t.status && (
+                                <span className="suggestion-row-status">
+                                  <span className="suggestion-row-dot" style={{ background: t.statusColor || 'var(--text-muted)' }} />
+                                  {t.status}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        ))}
+                        {q && !draftSettled && draftSuggestions.length === 0 && (
+                          <div className="suggestion-note">Searching…</div>
+                        )}
+                        {q && (
+                          <button
+                            className={`${rowCls('note')} suggestion-row-action`}
+                            onMouseDown={e => e.preventDefault()}
+                            onMouseEnter={() => setDraftHighlight(idxOf('note'))}
+                            onClick={saveDraft}
+                            disabled={saving}
+                          >
+                            <span className="suggestion-row-icon"><NoteIcon /></span>
+                            <span className="suggestion-row-name">Save as note “{q}”</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
               {creatingIn === 'draft' && (
                 <CreateTaskForm
                   teamId={teamId}
-                  initialName={draftTaskQuery.trim()}
+                  initialName={draftDesc.trim()}
                   busy={saving}
                   onCreate={createPicked}
                   onCancel={() => setCreatingIn(null)}

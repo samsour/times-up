@@ -700,3 +700,12 @@
     color-mix(in srgb, var(--text-muted) 22%, transparent) 6px 7px
   );
 }
+
+/* Draft popup: the suggestion rows sit inline, same look as the timer bar's */
+.draft-rows {
+  padding: 4px;
+}
+
+.draft-rows .suggestion-row {
+  padding: 6px 8px;
+}
